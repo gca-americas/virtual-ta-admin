@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop TA Admin - Courses</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .course-card {
+            background: rgba(13, 17, 23, 0.5); 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            text-align: left; 
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob shape1"></div>
+        <div class="blob shape2"></div>
+        <div class="blob shape3"></div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="container" id="app">
+        <div class="form-container" style="max-width: 900px;">
+            <div id="content">
+
+                <!-- Google Sign-In Container -->
+                <div id="admin-auth-container" style="text-align: center; margin-top: 40px;">
+                    <h2 style="color: white; margin-bottom: 5px;">SuperAdmin Required</h2>
+                    <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 25px;">Please authenticate to access the Course Dashboard</p>
+                    <div id="google-btn" style="display: inline-block;"></div>
+                    <p id="admin-auth-msg" style="color: #aaa; font-size: 0.85rem; margin-top: 20px;"></p>
+                </div>
+
+                <!-- Action Bar -->
+                <div id="admin-action-bar" class="hidden" style="margin-bottom: 25px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px;">
+                        <div>
+                            <h2 style="color: white; margin: 0 0 5px 0; font-size: 1.4rem;">Course Management</h2>
+                            <p id="logged-in-user" style="color: #aaa; font-size: 0.9rem; margin: 0;"></p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="window.location.href='index.html'" class="glow-btn" style="padding: 8px 16px; font-size: 0.9rem; width: auto; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Back to Dashboard</button>
+                            <button id="show-create-form-btn" class="glow-btn" style="padding: 8px 16px; font-size: 0.9rem; width: auto;">+ New Course</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Course Editor Form (Create/Update) -->
+                <div id="course-form-container" class="hidden" style="margin-bottom: 30px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h2 id="form-title" style="color: white; margin-top: 0; margin-bottom: 20px; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">Create New Course</h2>
+
+                    <input type="hidden" id="course-mode" value="create">
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">Unique ID <span style="color:#ff4a4a">*</span></label>
+                            <input type="text" id="course-id" class="premium-input-login" placeholder="e.g. gemini-101" style="margin: 0; min-height: 45px;">
+                        </div>
+                        <div>
+                            <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">Display Name <span style="color:#ff4a4a">*</span></label>
+                            <input type="text" id="course-name" class="premium-input-login" placeholder="e.g. Intro to Gemini API" style="margin: 0; min-height: 45px;">
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">GitHub / Source Repository URL <span style="color:#ff4a4a">*</span></label>
+                        <input type="url" id="course-repo-url" class="premium-input-login" placeholder="e.g. https://github.com/google/gemini-course.git" style="margin: 0; min-height: 45px;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">Directory Root <span style="color:#8b949e">(Default: /)</span></label>
+                            <input type="text" id="course-directory-root" class="premium-input-login" placeholder="/" style="margin: 0; min-height: 45px;" value="/">
+                        </div>
+                        <div style="display: flex; flex-direction: column; justify-content: center;">
+                            <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">Publish Status</label>
+                            <select id="course-published" class="premium-select-login" style="margin: 0; min-height: 45px;">
+                                <option value="true">Published</option>
+                                <option value="false">Draft (Hidden)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button id="save-course-btn" class="glow-btn" style="flex: 1;">Save Course</button>
+                        <button id="cancel-course-btn" class="glow-btn" style="flex: 1; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- COURSES VIEW -->
+                <div id="courses-view" class="hidden">
+                    <h2 style="color: white; margin-bottom: 15px; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">Master Course List</h2>
+
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <input type="text" id="course-search-input" class="premium-input-login" placeholder="Search by name or ID (use * for all)..." style="margin: 0; min-height: 45px;">
+                        <button id="course-search-btn" class="glow-btn" style="width: auto; padding: 0 20px;">Search</button>
+                    </div>
+
+                    <div id="courses-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 15px;">
+                        <p style="color: #aaa; font-size: 0.9rem;">Submit a search to load courses.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="courses.js"></script>
+</body>
+</html>

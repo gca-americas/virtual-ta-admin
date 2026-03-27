@@ -1,0 +1,36 @@
+steps:
+  # Step 1: Build the container image natively
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/virtual-ta-pipeline/virtual-ta-admin:latest', '.']
+
+  # Step 2: Push the container image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/virtual-ta-pipeline/virtual-ta-admin:latest']
+
+  # Step 3: Deploy the updated image directly into the active Cloud Run instance natively
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'virtual-ta-admin'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/virtual-ta-pipeline/virtual-ta-admin:latest'
+      - '--region'
+      - 'us-central1'
+      - '--project'
+      - '$PROJECT_ID'
+      - '--update-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID,DB_NAME=$_DB_NAME,GOOGLE_CLIENT_ID=$_GOOGLE_CLIENT_ID,FIRESTORE_DATABASE_ID=$_FIRESTORE_DATABASE_ID,ROOT_ADMIN_EMAILS=$_ROOT_ADMIN_EMAILS'
+
+substitutions:
+  _DB_NAME: 'event_db'
+  _FIRESTORE_DATABASE_ID: 'virtual-ta-interaction'
+  _GOOGLE_CLIENT_ID: 'PROVIDE_CLIENT_ID_AT_RUNTIME'
+  _ROOT_ADMIN_EMAILS: 'PROVIDE_EMAILS_AT_RUNTIME'
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/virtual-ta-pipeline/virtual-ta-admin:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

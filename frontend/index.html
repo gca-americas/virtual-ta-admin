@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop TA Admin</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob shape1"></div>
+        <div class="blob shape2"></div>
+        <div class="blob shape3"></div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="container" id="app">
+        <div class="form-container">
+            <div id="content">
+
+                <!-- Google Sign-In Container -->
+                <div id="admin-auth-container" style="text-align: center; margin-top: 40px;">
+                    <h2 style="color: white; margin-bottom: 5px;">Admin Login</h2>
+                    <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 25px;">Please authenticate to access the Event Dashboard</p>
+                    <div id="google-btn" style="display: inline-block;"></div>
+                    <p id="admin-auth-msg" style="color: #aaa; font-size: 0.85rem; margin-top: 20px;"></p>
+                </div>
+
+                <!-- Action Bar -->
+                <div id="admin-action-bar" class="hidden" style="margin-bottom: 25px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px;">
+                        <div>
+                            <h2 style="color: white; margin: 0 0 5px 0; font-size: 1.4rem;">Dashboard</h2>
+                            <p id="logged-in-user" style="color: #aaa; font-size: 0.9rem; margin: 0;"></p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="nav-dashboard-btn" class="glow-btn" style="padding: 8px 16px; font-size: 0.9rem; width: auto; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Events</button>
+                            <button id="nav-users-btn" class="glow-btn hidden" style="padding: 8px 16px; font-size: 0.9rem; width: auto; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Manage Admins</button>
+                            <button id="nav-courses-btn" class="glow-btn hidden" style="padding: 8px 16px; font-size: 0.9rem; width: auto; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Manage Courses</button>
+                            <button id="show-create-form-btn" class="glow-btn" style="padding: 8px 16px; font-size: 0.9rem; width: auto;">+ New</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Config Form -->
+                <div id="admin-config-container" class="hidden" style="margin-bottom: 30px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h2 style="color: white; margin-top: 0; margin-bottom: 20px; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">Create New Event</h2>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">Event Name</label>
+                        <input type="text" id="setup-event-name" class="premium-input-login" placeholder="e.g. google-io-26" style="margin: 0; min-height: 45px;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">Start Date</label>
+                            <input type="date" id="setup-start-date" class="premium-input-login" style="margin: 0; min-height: 45px;">
+                        </div>
+                        <div>
+                            <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">End Date</label>
+                            <input type="date" id="setup-end-date" class="premium-input-login" style="margin: 0; min-height: 45px;">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">Language</label>
+                            <select id="setup-language" class="premium-select-login" style="margin: 0; min-height: 45px;">
+                                <option value="English">English</option>
+                            </select>
+                        </div>
+                        <div style="position: relative;">
+                            <label style="display: block; color: #8b949e; font-size: 0.85rem; margin-bottom: 5px;">Country / Region</label>
+                            <input type="text" id="setup-country" class="premium-input-login" placeholder="e.g. United States" autocomplete="off" style="margin: 0; min-height: 45px;">
+                            <div id="country-combobox-dropdown" style="display: none; position: absolute; top: calc(100% + 5px); left: 0; right: 0; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); max-height: 250px; overflow-y: auto; z-index: 1000; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);"></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <strong style="display:block; margin-bottom: 10px; color: #e6edf3;">Select Courses (Max 5)</strong>
+                        
+                        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                            <input type="text" id="event-course-search-input" class="premium-input-login" placeholder="Search courses (use * for all)..." style="margin: 0; min-height: 40px; font-size: 0.85rem;">
+                            <button id="event-course-search-btn" class="glow-btn" style="width: auto; padding: 0 15px; font-size: 0.85rem;">Search</button>
+                        </div>
+                        
+                        <div id="setup-courses-list" style="max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                            <p style="color: #aaa; font-size: 0.9rem; margin: 0;">Perform a search to load available courses.</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button id="create-event-btn" class="glow-btn" style="flex: 1;">Deploy Event</button>
+                        <button id="cancel-create-btn" class="glow-btn" style="flex: 1; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- DASHBOARD VIEW -->
+                <div id="dashboard-view" class="hidden">
+                    <h2 style="color: white; margin-bottom: 15px; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">Existing Events</h2>
+
+                    <!-- SuperAdmin Advanced Filters -->
+                    <div id="superadmin-event-filters" class="hidden" style="margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <h3 style="color: #e6edf3; font-size: 0.95rem; margin-top: 0; margin-bottom: 12px;">Advanced Filters</h3>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <div>
+                                <label style="display: block; color: #8b949e; font-size: 0.8rem; margin-bottom: 4px;">Start Details (On/After)</label>
+                                <input type="date" id="filter-start-date" class="premium-input-login" style="padding: 6px 10px; margin: 0;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #8b949e; font-size: 0.8rem; margin-bottom: 4px;">End Details (On/Before)</label>
+                                <input type="date" id="filter-end-date" class="premium-input-login" style="padding: 6px 10px; margin: 0;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #8b949e; font-size: 0.8rem; margin-bottom: 4px;">Creator Email</label>
+                                <input type="text" id="filter-creator" class="premium-input-login" placeholder="linchr@google.com" style="padding: 6px 10px; margin: 0; width: 220px;">
+                            </div>
+                            <div style="margin-top: 18px; display: flex; gap: 8px;">
+                                <button id="apply-filters-btn" class="glow-btn" style="padding: 6px 12px; font-size: 0.85rem; width: auto;">Search</button>
+                                <button id="clear-filters-btn" class="glow-btn" style="padding: 6px 12px; font-size: 0.85rem; width: auto; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="past-events-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                        <p style="color: #aaa; font-size: 0.9rem;">Loading past events...</p>
+                    </div>
+                    
+                    <button id="download-events-btn" class="glow-btn" style="margin-top: 20px; padding: 12px; font-size: 0.95rem; background: #238636; box-shadow: 0 4px 14px rgba(35, 134, 54, 0.4); width: auto;">Download CSV (Full Export)</button>
+                </div>
+
+                <!-- USERS VIEW -->
+                <div id="users-view" class="hidden">
+                    <h2 style="color: white; margin-bottom: 15px; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">Manage Admins</h2>
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <input type="text" id="new-admin-email" placeholder="Email Address..." autocomplete="off" style="flex: 1; min-width: 0; padding: 8px 12px; margin: 0; box-sizing: border-box;" class="premium-input-login">
+                        <select id="new-admin-role" class="premium-select-login" style="width: auto; padding: 8px 12px; margin: 0;">
+                            <option value="admin">Admin</option>
+                            <option value="superadmin">Super Admin</option>
+                        </select>
+                        <button id="add-admin-btn" class="glow-btn" style="width: auto; padding: 8px 16px;">Invite</button>
+                    </div>
+
+                    <div id="admins-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+                        <p style="color: #aaa; font-size: 0.9rem;">Loading admins...</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="app.js"></script>
+</body>
+</html>

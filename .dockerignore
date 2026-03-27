@@ -1,0 +1,27 @@
+# Python Virtual Environments
+.venv/
+env/
+venv/
+__pycache__/
+*.pyc
+
+# Local Environment Variables & Secrets
+.env
+*.pem
+*.key
+
+# Git and Version Control
+.git/
+.gitignore
+
+# Infrastructure & Setup Code
+terraform/
+.terraform/
+system/
+
+# Documentation
+*.md
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
