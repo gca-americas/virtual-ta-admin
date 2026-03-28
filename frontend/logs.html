@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop TA Admin - Running Logs</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .log-card {
+            background: rgba(13, 17, 23, 0.5); 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            text-align: left; 
+            position: relative;
+        }
+        .status-badge {
+            font-size: 0.75rem; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+        }
+        .status-PENDING { background: rgba(210, 153, 34, 0.2); color: #d29922; }
+        .status-DEPLOYING { background: rgba(137, 87, 229, 0.2); color: #8957e5; }
+        .status-RUNNING { background: rgba(46, 160, 67, 0.2); color: #3fb950; }
+        .status-DEMOLISHING { background: rgba(248, 81, 73, 0.2); color: #ff7b72; }
+        .status-DEMOLISHED { background: rgba(139, 148, 158, 0.2); color: #8b949e; }
+    </style>
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob shape1"></div>
+        <div class="blob shape2"></div>
+        <div class="blob shape3"></div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="container" id="app">
+        <div class="form-container" style="max-width: 1000px;">
+            <div id="content">
+
+                <!-- Google Sign-In Container -->
+                <div id="admin-auth-container" style="text-align: center; margin-top: 40px;">
+                    <h2 style="color: white; margin-bottom: 5px;">SuperAdmin Required</h2>
+                    <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 25px;">Please authenticate to access the Running Logs</p>
+                    <div id="google-btn" style="display: inline-block;"></div>
+                    <p id="admin-auth-msg" style="color: #aaa; font-size: 0.85rem; margin-top: 20px;"></p>
+                </div>
+
+                <!-- Action Bar -->
+                <div id="admin-action-bar" class="hidden" style="margin-bottom: 25px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px;">
+                        <div>
+                            <h2 style="color: white; margin: 0 0 5px 0; font-size: 1.4rem;">Running Logs Tracker</h2>
+                            <p id="logged-in-user" style="color: #aaa; font-size: 0.9rem; margin: 0;"></p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="window.location.href='index.html'" class="glow-btn" style="padding: 8px 16px; font-size: 0.9rem; width: auto; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Dashboard</button>
+                            <button onclick="window.location.href='courses.html'" class="glow-btn" style="padding: 8px 16px; font-size: 0.9rem; width: auto; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Courses</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOGS VIEW -->
+                <div id="logs-view" class="hidden">
+                    
+                    <!-- Filters -->
+                    <div style="margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <input type="text" id="log-search-event-id" class="premium-input-login" placeholder="Search Event ID (Exact)..." style="margin: 0; min-height: 45px;">
+                            <input type="text" id="log-search-event-name" class="premium-input-login" placeholder="Search Event Name..." style="margin: 0; min-height: 45px;">
+                            
+                            <select id="log-status-select" class="premium-select-login" style="margin: 0; min-height: 45px;">
+                                <option value="">Any Status</option>
+                                <option value="PENDING">Pending</option>
+                                <option value="DEPLOYING">Deploying</option>
+                                <option value="RUNNING">Running</option>
+                                <option value="DEMOLISHING">Demolishing</option>
+                                <option value="DEMOLISHED">Demolished</option>
+                            </select>
+
+                            <select id="log-sort-select" class="premium-select-login" style="margin: 0; min-height: 45px;">
+                                <option value="scheduled_start_date">Sort: Scheduled Start</option>
+                                <option value="scheduled_end_date">Sort: Scheduled End</option>
+                                <option value="actual_datetime_started">Sort: Actual Started</option>
+                                <option value="actual_datetime_ended">Sort: Actual Ended</option>
+                                <option value="event_id">Sort: Event ID</option>
+                            </select>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
+                            <div>
+                                <label style="display: block; color: #8b949e; font-size: 0.8rem; margin-bottom: 5px;">Date Range Filter</label>
+                                <select id="log-date-type" class="premium-select-login" style="margin: 0; min-height: 45px;">
+                                    <option value="scheduled_start">Scheduled Start Date</option>
+                                    <option value="scheduled_end">Scheduled End Date</option>
+                                    <option value="actual_start">Actual Start Date</option>
+                                    <option value="actual_end">Actual End Date</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; color: #8b949e; font-size: 0.8rem; margin-bottom: 5px;">From Date</label>
+                                <input type="date" id="log-date-min" class="premium-input-login" style="margin: 0; min-height: 45px;">
+                            </div>
+                            <div>
+                                <label style="display: block; color: #8b949e; font-size: 0.8rem; margin-bottom: 5px;">To Date</label>
+                                <input type="date" id="log-date-max" class="premium-input-login" style="margin: 0; min-height: 45px;">
+                            </div>
+                            <div>
+                                <button id="execute-search-btn" class="glow-btn" style="margin: 0; min-height: 45px; padding: 0 25px; background: #0969da; border-color: rgba(255,255,255,0.1);">Execute Search</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="logs-list" style="display: flex; flex-direction: column; gap: 15px;">
+                        <!-- JS renders logs here -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Identity API -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="logs.js"></script>
+    <script>
+        window.onload = initAdminAuth;
+    </script>
+</body>
+</html>

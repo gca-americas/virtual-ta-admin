@@ -151,11 +151,11 @@ async def list_events(admin_info: dict = Depends(verify_admin_token)):
         try:
             if is_root:
                 cur.execute(
-                    "SELECT id, event_name, start_date, end_date, language, country, created_by FROM events ORDER BY start_date DESC"
+                    "SELECT e.id, e.event_name, e.start_date, e.end_date, e.language, e.country, e.created_by, COALESCE(rl.status, 'SCHEDULED') AS status FROM events e LEFT JOIN running_logs rl ON e.id = rl.event_id ORDER BY e.start_date DESC"
                 )
             else:
                 cur.execute(
-                    "SELECT id, event_name, start_date, end_date, language, country, created_by FROM events WHERE created_by = %s ORDER BY start_date DESC",
+                    "SELECT e.id, e.event_name, e.start_date, e.end_date, e.language, e.country, e.created_by, COALESCE(rl.status, 'SCHEDULED') AS status FROM events e LEFT JOIN running_logs rl ON e.id = rl.event_id WHERE e.created_by = %s ORDER BY e.start_date DESC",
                     (user_email,),
                 )
 
@@ -182,6 +182,7 @@ async def list_events(admin_info: dict = Depends(verify_admin_token)):
                         "language": row["language"],
                         "country": row["country"],
                         "createdBy": row["created_by"],
+                        "status": row["status"],
                         "courses": courses,
                     }
                 )
@@ -236,9 +237,7 @@ async def list_workshops(q: str = None, admin_info: dict = Depends(verify_admin_
     try:
         cur = conn.cursor()
         try:
-            if not q:
-                return []
-            elif q == "*":
+            if not q or q == "*":
                 cur.execute("SELECT id, name FROM courses WHERE is_published = TRUE ORDER BY id ASC")
             else:
                 wildcard_q = f"%%{q}%%"
@@ -348,9 +347,7 @@ async def list_admin_courses(q: str = None, admin_info: dict = Depends(verify_ad
     try:
         cur = conn.cursor()
         try:
-            if not q:
-                return []
-            elif q == "*":
+            if not q or q == "*":
                 cur.execute("SELECT id, name, repo_url, directory_root, is_published FROM courses ORDER BY name ASC")
             else:
                 wildcard_q = f"%%{q}%%"
@@ -440,5 +437,82 @@ async def admin_delete_course(course_id: str, admin_info: dict = Depends(verify_
     finally:
         conn.close()
     return {"status": "success", "message": f"Course {course_id} cleanly deleted!"}
+
+@app.get("/api/admin/logs")
+async def admin_get_logs(
+    event_id: str = None, 
+    event_name: str = None,
+    status: str = None,
+    sort_by: str = "scheduled_start_date",
+    date_filter_type: str = "scheduled_start",
+    date_min: str = None,
+    date_max: str = None,
+    admin_info: dict = Depends(verify_admin_token)
+):
+    if admin_info.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin clearance strictly required.")
+    
+    conn = get_db_connection()
+    logs = []
+    try:
+        cur = conn.cursor()
+        try:
+            query_base = "SELECT event_id, event_name, cloud_run_service_name, cloud_run_url, scheduled_start_date, scheduled_end_date, actual_datetime_started, actual_datetime_ended, status FROM running_logs WHERE 1=1"
+            params = []
+            
+            if event_id:
+                query_base += " AND event_id = %s"
+                params.append(event_id)
+                
+            if event_name:
+                query_base += " AND event_name ILIKE %s"
+                params.append(f"%{event_name}%")
+                
+            if status:
+                query_base += " AND status = %s"
+                params.append(status)
+                
+            if date_min and date_max:
+                if date_filter_type == "scheduled_start":
+                    query_base += " AND scheduled_start_date >= %s AND scheduled_start_date <= %s"
+                    params.extend([date_min, date_max])
+                elif date_filter_type == "scheduled_end":
+                    query_base += " AND scheduled_end_date >= %s AND scheduled_end_date <= %s"
+                    params.extend([date_min, date_max])
+                elif date_filter_type == "actual_start":
+                    query_base += " AND DATE(actual_datetime_started) >= %s AND DATE(actual_datetime_started) <= %s"
+                    params.extend([date_min, date_max])
+                elif date_filter_type == "actual_end":
+                    query_base += " AND DATE(actual_datetime_ended) >= %s AND DATE(actual_datetime_ended) <= %s"
+                    params.extend([date_min, date_max])
+                
+            allowed_sort = ["event_id", "event_name", "scheduled_start_date", "scheduled_end_date", "actual_datetime_started", "actual_datetime_ended", "status"]
+            if sort_by not in allowed_sort:
+                sort_by = "scheduled_start_date"
+                
+            query_base += f" ORDER BY {sort_by} DESC"
+            
+            cur.execute(query_base, tuple(params))
+            for row in cur.fetchall():
+                logs.append({
+                    "event_id": row[0],
+                    "event_name": row[1],
+                    "cloud_run_service_name": row[2],
+                    "cloud_run_url": row[3],
+                    "scheduled_start_date": row[4].strftime("%Y-%m-%d") if row[4] else None,
+                    "scheduled_end_date": row[5].strftime("%Y-%m-%d") if row[5] else None,
+                    "actual_datetime_started": row[6].isoformat() if row[6] else None,
+                    "actual_datetime_ended": row[7].isoformat() if row[7] else None,
+                    "status": row[8]
+                })
+        finally:
+            cur.close()
+    except Exception as e:
+        print(f"Error fetching logs natively: {e}")
+        raise HTTPException(status_code=500, detail="Database fetch execution aborted.")
+    finally:
+        conn.close()
+        
+    return logs
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

@@ -17,10 +17,6 @@ const courseSearchBtn = document.getElementById("course-search-btn");
 
 courseSearchBtn?.addEventListener("click", () => {
     const q = courseSearchInput.value.trim();
-    if (!q) {
-        document.getElementById("courses-list").innerHTML = "<p style='color: #aaa; font-size: 0.9rem;'>Please enter a search term (use * for all).</p>";
-        return;
-    }
     loadCourses(q);
 });
 

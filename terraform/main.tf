@@ -49,6 +49,55 @@ resource "google_project_service" "secretmanager_api" {
   disable_on_destroy = false
 }
 
+# 2.7 Enable Observability APIs (Workload Manager, Monitoring, Asset, Logging)
+resource "google_project_service" "workloadmanager_api" {
+  project = var.project_id
+  service = "workloadmanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "monitoring_api" {
+  project = var.project_id
+  service = "monitoring.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "cloudasset_api" {
+  project = var.project_id
+  service = "cloudasset.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "logging_api" {
+  project = var.project_id
+  service = "logging.googleapis.com"
+  disable_on_destroy = false
+}
+
+# Fetch the active GCP Project logic (grants access to Project Number)
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+# 2.8 Grant Workload Manager Service Agent Identity Access
+resource "google_project_iam_member" "workload_manager_service_agent" {
+  project = var.project_id
+  role    = "roles/workloadmanager.serviceAgent"
+  member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-workloadmanager.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "workload_manager_admin" {
+  project = var.project_id
+  role    = "roles/workloadmanager.admin"
+  member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-workloadmanager.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "workload_manager_viewer" {
+  project = var.project_id
+  role    = "roles/workloadmanager.viewer"
+  member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-workloadmanager.iam.gserviceaccount.com"
+}
+
 # 2.7 Create Secret Manager Payload natively
 resource "google_secret_manager_secret" "db_credentials" {
   project   = var.project_id

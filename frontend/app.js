@@ -185,10 +185,6 @@ const eventCourseSearchBtn = document.getElementById("event-course-search-btn");
 
 eventCourseSearchBtn?.addEventListener("click", () => {
     const q = eventCourseSearchInput.value.trim();
-    if (!q) {
-        setupCoursesList.innerHTML = "<p style='color: #aaa; font-size: 0.9rem; margin: 0;'>Please enter a search term (use * for all).</p>";
-        return;
-    }
     loadAdminWorkshops(q);
 });
 
@@ -384,11 +380,15 @@ function renderPastEvents() {
     container.innerHTML = filteredEvents.map(e => `
         <div style="background: rgba(13, 17, 23, 0.5); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); text-align: left; position: relative;">
             <button onclick="deleteEvent('${e.id}')" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #ff4a4a; cursor: pointer; font-size: 1.2rem;" title="Delete Event">🗑️</button>
-            <h3 style="color: #4a90e2; margin: 0 0 5px 0; padding-right: 30px;">${e.event_name} <span style="font-size:0.75rem; color:#8b949e; font-weight:normal;">(${e.id})</span></h3>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                <h3 style="color: #4a90e2; margin: 0; padding-right: 30px;">${e.event_name} <span style="font-size:0.75rem; color:#8b949e; font-weight:normal;">(${e.id})</span></h3>
+                <span class="status-badge status-${e.status || 'SCHEDULED'}" style="margin-right: 35px;">${e.status || 'SCHEDULED'}</span>
+            </div>
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Created By:</strong> ${e.createdBy || 'Unknown'}</p>
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Dates:</strong> ${e.start_date} to ${e.end_date}</p>
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Courses:</strong> ${e.courses.join(", ")}</p>
-            <p style="margin: 0; font-size: 0.85rem; color: #e6edf3;"><strong>Location:</strong> ${e.language}-${e.country}</p>
+            <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Location:</strong> ${e.language}-${e.country}</p>
+            <p style="margin: 0; font-size: 0.85rem; color: #e6edf3;"><strong>URL:</strong> <a href="https://vta-${e.id}.gca-americas.dev" target="_blank" style="color: #58a6ff;">https://vta-${e.id}.gca-americas.dev</a></p>
         </div>
     `).join('') + ((!isSuperAdmin && allLoadedEvents.length > 5) ? `<p style="text-align: center; color: #aaa; font-size: 0.8rem; margin-top: 10px; grid-column: 1 / -1;">Showing 5 of ${allLoadedEvents.length} total events</p>` : '');
 }
@@ -506,6 +506,9 @@ createEventBtn.addEventListener("click", async () => {
             selectedEventCourses.clear();
             setupCoursesList.innerHTML = "<p style='color: #aaa; font-size: 0.9rem; margin: 0;'>Perform a search to load available courses.</p>";
             
+            const targetUrl = `https://vta-${data.event_id}.gca-americas.dev`;
+            alert(`✅ Event Created Successfully!\n\nThe automated Cloud Build pipeline is now provisioning your ephemeral architecture.\n\nYour service will become available at:\n${targetUrl}`);
+            
             adminConfigContainer.classList.add("hidden");
             showCreateFormBtn.classList.remove("hidden");
             
@@ -517,7 +520,7 @@ createEventBtn.addEventListener("click", async () => {
         alert("Server error configuring the event.");
     } finally {
         createEventBtn.disabled = false;
-        createEventBtn.textContent = "Save Event";
+        createEventBtn.textContent = "Schedule Event";
     }
 });
 

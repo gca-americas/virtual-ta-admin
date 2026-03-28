@@ -95,16 +95,10 @@ gcloud artifacts repositories create virtual-ta-pipeline \
 
 ## 💻 4. Local Testing & Starting the Services
 
-**A. Load Skills (Must be done first!)**
-The application relies on workshop course material from an external repository.
-Navigate to the `workshop-ta` directory and run:
-```bash
-python load_skills.py
-```
-
 **B. Start the Admin App**
 In a new terminal, navigate to `workshop-ta-admin` and run:
 ```bash
+export GOOGLE_CLOUD_PROJECT=""
 pip install -r requirements.txt
 uvicorn backend.main:app --reload --port 8081
 ```

@@ -1,11 +1,14 @@
 import os
-import pg8000
 from google.cloud.sql.connector import Connector, IPTypes
 from fastapi import HTTPException
 from google.cloud import secretmanager
 
 # Optional fallback: load from Secret Manager natively if not already passed via .env variables
-if not os.environ.get("CLOUD_SQL_CONNECTION_NAME"):
+if (
+    not os.environ.get("CLOUD_SQL_CONNECTION_NAME")
+    or not os.environ.get("DB_USER")
+    or not os.environ.get("DB_PASS")
+):
     try:
         project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
         client = secretmanager.SecretManagerServiceClient()

@@ -125,14 +125,14 @@ Deploy to Cloud Run after infra already setup.
 
 ```bash
 
-export PROJECT_ID="gca-america-virtual-ta"
-export CLIENT_ID="your-client-id"
-export DB_PASSWORD="your-postgres-password"
-export ROOT_ADMIN_EMAILS="your_google_email@gmail.com"
+export PROJECT_ID=""
+export CLIENT_ID=""
+export DB_PASSWORD=""
+export ROOT_ADMIN_EMAILS=""
 
 # Push your local code natively passing strictly the Cloud Run substitution logic
 gcloud builds submit --config cloudbuild.yaml \
-    --substitutions=_GOOGLE_CLIENT_ID=$CLIENT_ID,_ROOT_ADMIN_EMAILS=$ROOT_ADMIN_EMAILS \
+    --substitutions=^:^_DB_NAME="event_db":_GOOGLE_CLIENT_ID="$CLIENT_ID":_FIRESTORE_DATABASE_ID="virtual-ta-interaction":_ROOT_ADMIN_EMAILS="$ROOT_ADMIN_EMAILS" \
     .
 ```
 
