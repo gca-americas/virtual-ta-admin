@@ -134,7 +134,12 @@ function renderCourses() {
                 </span>
             </div>
             <p style="margin: 0 0 5px 0; font-size: 0.85rem; color: #8b949e; word-break: break-all;"><strong>Repo:</strong> <a href="${c.repo_url}" target="_blank" style="color: #58a6ff;">${c.repo_url}</a></p>
-            <p style="margin: 0 0 15px 0; font-size: 0.85rem; color: #8b949e;"><strong>Path:</strong> <code>${c.directory_root}</code></p>
+            <p style="margin: 0 0 5px 0; font-size: 0.85rem; color: #8b949e;"><strong>Path:</strong> <code>${c.directory_root}</code></p>
+            <div style="display: flex; gap: 15px; margin: 0 0 10px 0; font-size: 0.8rem; color: #8b949e; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                <div><strong>Eval Score:</strong> <span style="color: ${c.eval_score === '100%' || c.eval_score === '100' ? '#3fb950' : (c.eval_score === '0%' ? '#aaa' : '#d29922')};">${c.eval_score || '0%'}</span></div>
+                <div><strong>Last Eval:</strong> <span>${c.last_eval_date || 'N/A'}</span></div>
+            </div>
+            <p style="margin: 0 0 15px 0; font-size: 0.75rem; color: #6e7681; font-style: italic;">Last Updated: ${c.last_update_date || 'Just now'}</p>
             
             <div style="display: flex; gap: 8px;">
                 <button onclick="editCourse('${c.id}')" class="glow-btn" style="padding: 4px 10px; font-size: 0.8rem; width: auto; min-height: 0;">Edit</button>
