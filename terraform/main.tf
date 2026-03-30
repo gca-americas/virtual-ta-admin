@@ -203,6 +203,18 @@ resource "google_project_iam_member" "app_sa_aiplatform_user" {
   member  = "serviceAccount:${google_service_account.app_sa.email}"
 }
 
+resource "google_project_iam_member" "app_sa_cloudtrace_agent" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.app_sa.email}"
+}
+
+resource "google_project_iam_member" "app_sa_logging_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.app_sa.email}"
+}
+
 # (Optional Deployment) 5. Cloud Run Service 
 resource "google_cloud_run_v2_service" "backend" {
   name     = var.service_name
