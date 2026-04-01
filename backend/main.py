@@ -136,6 +136,7 @@ async def create_event(
     return {
         "status": "success",
         "message": f"Event {request.event_name} successfully saved to Cloud SQL!",
+        "event_id": event_id
     }
 
 
@@ -147,10 +148,10 @@ async def list_events(
     start_date: str = None,
     end_date: str = None,
     creator_email: str = None,
-    admin_info: dict = Depends(verify_admin_token)
+    admin_info: dict = Depends(verify_admin_token),
 ):
     user_email = admin_info.get("email", "unknown")
-    is_root = admin_info.get("role") == "superadmin"
+    is_root = admin_info.get("role") in ["superadmin", "courseadmin"]
 
     conn = get_db_connection()
     events = []
@@ -185,7 +186,7 @@ async def list_events(
                 params.append(end_date)
 
             if status:
-                status_list = [s.strip() for s in status.split(',')]
+                status_list = [s.strip() for s in status.split(",")]
                 status_conds = []
                 for s in status_list:
                     if s == "SCHEDULED":
@@ -207,7 +208,7 @@ async def list_events(
             db_events = [dict(zip(columns, row)) for row in cur.fetchall()]
 
             for row in db_events:
-                courses_list = row["courses"].split(',') if row["courses"] else []
+                courses_list = row["courses"].split(",") if row["courses"] else []
                 events.append(
                     {
                         "id": row["id"],
@@ -239,10 +240,10 @@ async def export_events(
     start_date: str = None,
     end_date: str = None,
     creator_email: str = None,
-    admin_info: dict = Depends(verify_admin_token)
+    admin_info: dict = Depends(verify_admin_token),
 ):
     user_email = admin_info.get("email", "unknown")
-    is_root = admin_info.get("role") == "superadmin"
+    is_root = admin_info.get("role") in ["superadmin", "courseadmin"]
 
     conn = get_db_connection()
     events = []
@@ -264,9 +265,10 @@ async def export_events(
             if not is_root:
                 conditions.append("e.created_by = %s")
                 params.append(user_email)
-                
+
                 # Natively restrict Non-SuperAdmins strictly to the last 6 months mathematically!
                 import datetime
+
                 six_months_ago = datetime.datetime.now() - datetime.timedelta(days=180)
                 conditions.append("e.start_date >= %s")
                 params.append(six_months_ago.strftime("%Y-%m-%d"))
@@ -283,7 +285,7 @@ async def export_events(
                 params.append(end_date)
 
             if status:
-                status_list = [s.strip() for s in status.split(',')]
+                status_list = [s.strip() for s in status.split(",")]
                 status_conds = []
                 for s in status_list:
                     if s == "SCHEDULED":
@@ -304,13 +306,17 @@ async def export_events(
             db_events = [dict(zip(columns, row)) for row in cur.fetchall()]
 
             for row in db_events:
-                courses_list = row["courses"].split(',') if row["courses"] else []
+                courses_list = row["courses"].split(",") if row["courses"] else []
                 events.append(
                     {
                         "id": row["id"],
                         "event_name": row["event_name"],
-                        "start_date": row["start_date"].strftime("%Y-%m-%d") if getattr(row.get("start_date"), "strftime", None) else str(row.get("start_date", "")),
-                        "end_date": row["end_date"].strftime("%Y-%m-%d") if getattr(row.get("end_date"), "strftime", None) else str(row.get("end_date", "")),
+                        "start_date": row["start_date"].strftime("%Y-%m-%d")
+                        if getattr(row.get("start_date"), "strftime", None)
+                        else str(row.get("start_date", "")),
+                        "end_date": row["end_date"].strftime("%Y-%m-%d")
+                        if getattr(row.get("end_date"), "strftime", None)
+                        else str(row.get("end_date", "")),
                         "language": row["language"],
                         "country": row["country"],
                         "createdBy": row["created_by"],
@@ -329,7 +335,7 @@ async def export_events(
 @app.delete("/api/admin/events/{event_id}")
 async def delete_event(event_id: str, admin_info: dict = Depends(verify_admin_token)):
     user_email = admin_info.get("email", "unknown")
-    is_root = admin_info.get("role") == "superadmin"
+    is_root = admin_info.get("role") in ["superadmin", "courseadmin"]
 
     conn = get_db_connection()
     try:
@@ -479,7 +485,7 @@ async def delete_user(user_email: str, admin_info: dict = Depends(verify_admin_t
 async def list_admin_courses(
     q: str = None, admin_info: dict = Depends(verify_admin_token)
 ):
-    if admin_info.get("role") != "superadmin":
+    if admin_info.get("role") not in ["superadmin", "courseadmin"]:
         raise HTTPException(
             status_code=403, detail="SuperAdmin clearance strictly required."
         )
@@ -519,9 +525,13 @@ async def list_admin_courses(
                         "repo_url": row[2],
                         "directory_root": row[3],
                         "is_published": row[4],
-                        "last_eval_date": row[5].strftime("%Y-%m-%d %H:%M:%S") if row[5] else None,
+                        "last_eval_date": row[5].strftime("%Y-%m-%d %H:%M:%S")
+                        if row[5]
+                        else None,
                         "eval_score": row[6],
-                        "last_update_date": row[7].strftime("%Y-%m-%d %H:%M:%S") if row[7] else None,
+                        "last_update_date": row[7].strftime("%Y-%m-%d %H:%M:%S")
+                        if row[7]
+                        else None,
                     }
                 )
         finally:
@@ -593,7 +603,7 @@ def validate_github_repo_sync(repo_url: str, directory_root: str):
 async def create_course(
     req: CourseRequest, admin_info: dict = Depends(verify_admin_token)
 ):
-    if admin_info.get("role") != "superadmin":
+    if admin_info.get("role") not in ["superadmin", "courseadmin"]:
         raise HTTPException(
             status_code=403, detail="SuperAdmin clearance strictly required."
         )
@@ -632,7 +642,7 @@ async def create_course(
 async def update_course(
     course_id: str, req: CourseRequest, admin_info: dict = Depends(verify_admin_token)
 ):
-    if admin_info.get("role") != "superadmin":
+    if admin_info.get("role") not in ["superadmin", "courseadmin"]:
         raise HTTPException(
             status_code=403, detail="SuperAdmin clearance strictly required."
         )
@@ -677,7 +687,7 @@ async def update_course(
 async def admin_delete_course(
     course_id: str, admin_info: dict = Depends(verify_admin_token)
 ):
-    if admin_info.get("role") != "superadmin":
+    if admin_info.get("role") not in ["superadmin", "courseadmin"]:
         raise HTTPException(
             status_code=403, detail="SuperAdmin clearance strictly required."
         )
@@ -717,7 +727,7 @@ async def admin_get_logs(
     date_max: str = None,
     admin_info: dict = Depends(verify_admin_token),
 ):
-    if admin_info.get("role") not in ["admin", "superadmin"]:
+    if admin_info.get("role") not in ["admin", "superadmin", "courseadmin"]:
         raise HTTPException(
             status_code=403, detail="Admin clearance strictly required."
         )
@@ -818,7 +828,7 @@ async def admin_export_logs(
     date_max: str = None,
     admin_info: dict = Depends(verify_admin_token),
 ):
-    if admin_info.get("role") not in ["admin", "superadmin"]:
+    if admin_info.get("role") not in ["admin", "superadmin", "courseadmin"]:
         raise HTTPException(
             status_code=403, detail="Admin clearance strictly required."
         )
@@ -909,10 +919,9 @@ async def admin_export_logs(
 
 @app.get("/api/admin/eval_suggestions")
 async def get_eval_suggestions(
-    course_id: str,
-    admin_info: dict = Depends(verify_admin_token)
+    course_id: str, admin_info: dict = Depends(verify_admin_token)
 ):
-    if admin_info.get("role") not in ["admin", "superadmin"]:
+    if admin_info.get("role") not in ["admin", "superadmin", "courseadmin"]:
         raise HTTPException(
             status_code=403, detail="Admin clearance strictly required."
         )
@@ -930,16 +939,18 @@ async def get_eval_suggestions(
                 ORDER BY eval_date_time DESC
                 LIMIT 20
                 """,
-                (course_id,)
+                (course_id,),
             )
             for row in cur.fetchall():
-                suggestions.append({
-                    "id": row[0],
-                    "course_id": row[1],
-                    "eval_date_time": row[2].isoformat() if row[2] else None,
-                    "score": row[3],
-                    "suggest_update": row[4]
-                })
+                suggestions.append(
+                    {
+                        "id": row[0],
+                        "course_id": row[1],
+                        "eval_date_time": row[2].isoformat() if row[2] else None,
+                        "score": row[3],
+                        "suggest_update": row[4],
+                    }
+                )
         finally:
             cur.close()
     except Exception as e:
@@ -947,17 +958,15 @@ async def get_eval_suggestions(
         raise HTTPException(status_code=500, detail="Database fetch failed.")
     finally:
         conn.close()
-        
+
     return suggestions
 
 
 @app.get("/api/admin/eval_logs")
 async def get_eval_logs(
-    course_id: str,
-    eval_date_time: str,
-    admin_info: dict = Depends(verify_admin_token)
+    course_id: str, eval_date_time: str, admin_info: dict = Depends(verify_admin_token)
 ):
-    if admin_info.get("role") not in ["admin", "superadmin"]:
+    if admin_info.get("role") not in ["admin", "superadmin", "courseadmin"]:
         raise HTTPException(
             status_code=403, detail="Admin clearance strictly required."
         )
@@ -974,20 +983,22 @@ async def get_eval_logs(
                 WHERE course_id = %s AND eval_date_time = %s
                 ORDER BY question_number ASC
                 """,
-                (course_id, eval_date_time)
+                (course_id, eval_date_time),
             )
             for row in cur.fetchall():
-                logs.append({
-                    "id": row[0],
-                    "event_id": row[1],
-                    "course_id": row[2],
-                    "eval_date_time": row[3].isoformat() if row[3] else None,
-                    "level": row[4],
-                    "question_number": row[5],
-                    "question": row[6],
-                    "prefer_answer": row[7],
-                    "ta_answer": row[8]
-                })
+                logs.append(
+                    {
+                        "id": row[0],
+                        "event_id": row[1],
+                        "course_id": row[2],
+                        "eval_date_time": row[3].isoformat() if row[3] else None,
+                        "level": row[4],
+                        "question_number": row[5],
+                        "question": row[6],
+                        "prefer_answer": row[7],
+                        "ta_answer": row[8],
+                    }
+                )
         finally:
             cur.close()
     except Exception as e:

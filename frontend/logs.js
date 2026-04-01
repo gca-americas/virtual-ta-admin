@@ -78,7 +78,7 @@ async function processAdminIdToken(token) {
         
         const authData = await authRes.json();
         
-        if (!authRes.ok || (authData.role !== 'superadmin' && authData.role !== 'admin')) {
+        if (!authRes.ok || !['superadmin', 'courseadmin', 'admin'].includes(authData.role)) {
             sessionStorage.removeItem("adminIdToken");
             window.google.accounts.id.renderButton(
                 document.getElementById("google-btn"),

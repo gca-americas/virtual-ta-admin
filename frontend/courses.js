@@ -108,13 +108,13 @@ async function processAdminIdToken(token) {
         
         const authData = await authRes.json();
         
-        if (!authRes.ok || authData.role !== 'superadmin') {
+        if (!authRes.ok || !['superadmin', 'courseadmin'].includes(authData.role)) {
             sessionStorage.removeItem("adminIdToken");
             window.google.accounts.id.renderButton(
                 document.getElementById("google-btn"),
                 { theme: "outline", size: "large" }
             );
-            document.getElementById("admin-auth-msg").innerHTML = `<strong style='color:#ff4a4a'>SuperAdmin clearance perfectly required.</strong>`;
+            document.getElementById("admin-auth-msg").innerHTML = `<strong style='color:#ff4a4a'>SuperAdmin or CourseAdmin clearance strictly required.</strong>`;
             return;
         }
         

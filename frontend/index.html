@@ -265,16 +265,25 @@
                         <select id="new-admin-role" class="premium-select-login"
                             style="width: auto; padding: 8px 12px; margin: 0;">
                             <option value="admin">Admin</option>
+                            <option value="courseadmin">Course Admin</option>
                             <option value="superadmin">Super Admin</option>
                         </select>
                         <button id="add-admin-btn" class="glow-btn"
                             style="width: auto; padding: 8px 16px;">Invite</button>
                     </div>
 
-                    <div id="admins-list"
-                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
-                        <p style="color: #aaa; font-size: 0.9rem;">Loading admins...</p>
-                    </div>
+                    <table style="width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); margin-top: 20px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; color: #8b949e; font-size: 0.85rem;">
+                                <th style="padding: 12px 15px;">Email Address</th>
+                                <th style="padding: 12px 15px; width: 150px;">Admin Role</th>
+                                <th style="padding: 12px 15px; width: 100px; text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admins-list">
+                            <tr><td colspan="3" style="padding: 15px; color: #aaa; text-align: center; font-size: 0.9rem;">Loading admins naturally...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
 
             </div>

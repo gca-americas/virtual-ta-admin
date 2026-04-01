@@ -32,11 +32,11 @@ let hasMoreEvents = false;
 // Toggles for SPA routing
 const countries = [
     "United States", "Canada", "Mexico", "Brazil",
-    "Antigua and Barbuda", "Argentina", "Bahamas", "Barbados", "Belize", "Bolivia", 
-    "Chile", "Colombia", "Costa Rica", "Cuba", "Dominica", "Dominican Republic", 
-    "Ecuador", "El Salvador", "Grenada", "Guatemala", "Guyana", "Haiti", 
-    "Honduras", "Jamaica", "Nicaragua", "Panama", "Paraguay", "Peru", 
-    "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", 
+    "Antigua and Barbuda", "Argentina", "Bahamas", "Barbados", "Belize", "Bolivia",
+    "Chile", "Colombia", "Costa Rica", "Cuba", "Dominica", "Dominican Republic",
+    "Ecuador", "El Salvador", "Grenada", "Guatemala", "Guyana", "Haiti",
+    "Honduras", "Jamaica", "Nicaragua", "Panama", "Paraguay", "Peru",
+    "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines",
     "Suriname", "Trinidad and Tobago", "Uruguay", "Venezuela"
 ];
 const countryDropdown = document.getElementById("country-combobox-dropdown");
@@ -45,7 +45,7 @@ function renderCountryDropdown(filter = "") {
     if (!countryDropdown) return;
     countryDropdown.innerHTML = "";
     const filtered = countries.filter(c => c.toLowerCase().includes(filter.toLowerCase()));
-    
+
     if (filtered.length === 0) {
         countryDropdown.style.display = "none";
         return;
@@ -58,10 +58,10 @@ function renderCountryDropdown(filter = "") {
         div.style.cursor = "pointer";
         div.style.color = "#c9d1d9";
         div.style.borderBottom = "1px solid rgba(255,255,255,0.05)";
-        
+
         div.onmouseover = () => { div.style.background = "rgba(88, 166, 255, 0.2)"; div.style.color = "white"; };
         div.onmouseout = () => { div.style.background = "transparent"; div.style.color = "#c9d1d9"; };
-        
+
         div.onclick = () => {
             setupCountry.value = c;
             countryDropdown.style.display = "none";
@@ -111,7 +111,7 @@ async function initAdminAuth() {
     try {
         const res = await fetch(`${API_BASE}/config`);
         const config = await res.json();
-        
+
         if (!config.google_client_id) {
             document.getElementById("admin-auth-msg").innerHTML = "<strong style='color:#ff4a4a'>Google Client ID is missing.</strong> Please add GOOGLE_CLIENT_ID to your backend .env file.";
             return;
@@ -147,7 +147,7 @@ async function processAdminIdToken(token) {
             headers: { "Authorization": `Bearer ${adminIdToken}` },
             cache: "no-store"
         });
-        
+
         if (!authRes.ok) {
             sessionStorage.removeItem("adminIdToken");
             window.google.accounts.id.renderButton(
@@ -156,21 +156,42 @@ async function processAdminIdToken(token) {
             );
             return;
         }
-        
+
+        const authData = await authRes.json();
+        isSuperAdmin = authData.role === 'superadmin';
+        const isCourseAdmin = authData.role === 'courseadmin';
+
         document.getElementById("admin-auth-container").classList.add("hidden");
-        
+
         try {
             const payload = JSON.parse(atob(adminIdToken.split('.')[1]));
-            document.getElementById("logged-in-user").innerHTML = `Logged in as <strong style="color: #58a6ff;">${payload.email}</strong>`;
-        } catch(e) { console.error("JWT Decode failed", e); }
+            let labelHtml = `Logged in as <strong style="color: #58a6ff;">${payload.email}</strong>`;
+
+            if (isSuperAdmin) {
+                labelHtml += ` <span style="font-size: 0.8rem; color: #f85149; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle;">SuperAdmin</span>`;
+            } else if (isCourseAdmin) {
+                labelHtml += ` <span style="font-size: 0.8rem; color: #d29922; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle;">Course Admin</span>`;
+            }
+
+            document.getElementById("logged-in-user").innerHTML = labelHtml;
+        } catch (e) { console.error("JWT Decode failed", e); }
 
         adminActionBar.classList.remove("hidden");
         dashboardView.classList.remove("hidden");
         navDashboardBtn.style.background = "#0969da";
-        
+
+        if (isSuperAdmin || isCourseAdmin) {
+            document.getElementById("nav-courses-btn")?.classList.remove("hidden");
+            document.getElementById("superadmin-event-filters")?.classList.remove("hidden");
+        }
+
+        if (isSuperAdmin) {
+            document.getElementById("nav-users-btn")?.classList.remove("hidden");
+            loadAdminsIfAuthorized();
+        }
+
         loadPastEvents();
-        loadAdminsIfAuthorized();
-    } catch(e) {
+    } catch (e) {
         document.getElementById("admin-auth-msg").innerHTML = `<strong style='color:#ff4a4a'>Network connection failed.</strong>`;
     }
 }
@@ -195,7 +216,7 @@ eventCourseSearchInput?.addEventListener("keypress", (e) => {
     if (e.key === "Enter") eventCourseSearchBtn.click();
 });
 
-window.toggleCourseSelection = function(courseId, isChecked) {
+window.toggleCourseSelection = function (courseId, isChecked) {
     if (isChecked) {
         selectedEventCourses.add(courseId);
     } else {
@@ -207,14 +228,14 @@ async function loadAdminWorkshops(queryStr = "") {
     try {
         const urlParams = new URLSearchParams();
         if (queryStr) urlParams.append("q", queryStr);
-        
+
         const response = await fetch(`${API_BASE}/workshops?${urlParams.toString()}`, {
             headers: { "Authorization": `Bearer ${adminIdToken}` }
         });
         if (!response.ok) return;
-        
+
         const allAvailableWorkshops = await response.json();
-        
+
         if (allAvailableWorkshops.length === 0) {
             setupCoursesList.innerHTML = "<p style='color: #aaa; font-size: 0.9rem; margin: 0;'>No matching published courses found.</p>";
             return;
@@ -240,42 +261,37 @@ async function loadAdminsIfAuthorized() {
             cache: "no-store"
         });
         if (res.status === 403) return; // Silent return for standard admins
-        
-        isSuperAdmin = true;
-        const users = await res.json();
-        
-        // Append SuperAdmin Badge
-        const userLabel = document.getElementById("logged-in-user");
-        if (userLabel && !userLabel.innerHTML.includes("SuperAdmin")) {
-            userLabel.innerHTML += ` <span style="font-size: 0.8rem; color: #f85149; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle;">SuperAdmin</span>`;
-        }
 
-        // Show superadmin features
-        document.getElementById("nav-users-btn")?.classList.remove("hidden");
-        document.getElementById("nav-courses-btn")?.classList.remove("hidden");
-        document.getElementById("superadmin-event-filters")?.classList.remove("hidden");
-        
+        const users = await res.json();
+
         // Refresh event rendering to strip top 5 limit implicitly since they are now superadmin
         if (allLoadedEvents.length > 0) {
             renderPastEvents();
         }
 
         const container = document.getElementById("admins-list");
+        if (users.length === 0) {
+            container.innerHTML = `<tr><td colspan="3" style="padding: 15px; color: #aaa; text-align: center; font-size: 0.9rem;">No admins configured.</td></tr>`;
+            return;
+        }
+
         container.innerHTML = users.map(u => `
-            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-                <div>
-                    <strong style="color: #e6edf3;">${u.email}</strong>
-                    <span style="font-size: 0.8rem; color: ${u.role === 'superadmin' ? '#f85149' : '#58a6ff'}; margin-left: 8px; padding: 2px 6px; background: rgba(255,255,255,0.1); border-radius: 4px;">${u.role}</span>
-                </div>
-                <button onclick="removeAdmin('${u.email}')" class="text-btn" style="color: #ff4a4a; font-size: 0.9rem;">Remove</button>
-            </div>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 15px; color: #e6edf3; font-weight: bold;">${u.email}</td>
+                <td style="padding: 15px;">
+                    <span style="font-size: 0.8rem; color: ${u.role === 'superadmin' ? '#f85149' : (u.role === 'courseadmin' ? '#d29922' : '#58a6ff')}; padding: 2px 6px; background: rgba(255,255,255,0.1); border-radius: 4px; text-transform: capitalize;">${u.role}</span>
+                </td>
+                <td style="padding: 15px; text-align: right;">
+                    <button onclick="removeAdmin('${u.email}')" class="glow-btn" style="color: #ff4a4a; background: transparent; border: 1px solid rgba(255,74,74,0.3); font-size: 0.8rem; padding: 4px 10px; box-shadow: none; width: auto; min-height: 0;">Remove</button>
+                </td>
+            </tr>
         `).join('');
-    } catch(e) {
+    } catch (e) {
         console.error(e);
     }
 }
 
-window.removeAdmin = async function(email) {
+window.removeAdmin = async function (email) {
     if (!confirm(`Revoke access for ${email}?`)) return;
     try {
         const res = await fetch(`${API_BASE}/admin/users/${email}`, {
@@ -288,7 +304,7 @@ window.removeAdmin = async function(email) {
         } else {
             alert(data.detail);
         }
-    } catch(e) {
+    } catch (e) {
         alert("Network error.");
     }
 };
@@ -297,13 +313,13 @@ addAdminBtn?.addEventListener("click", async () => {
     const email = document.getElementById("new-admin-email").value.trim();
     const role = document.getElementById("new-admin-role").value;
     if (!email) return alert("Enter an email address.");
-    
+
     try {
         addAdminBtn.textContent = "...";
         addAdminBtn.disabled = true;
         const res = await fetch(`${API_BASE}/admin/users`, {
             method: "POST",
-            headers: { 
+            headers: {
                 "Authorization": `Bearer ${adminIdToken}`,
                 "Content-Type": "application/json"
             },
@@ -316,7 +332,7 @@ addAdminBtn?.addEventListener("click", async () => {
         } else {
             alert(data.detail);
         }
-    } catch(e) {
+    } catch (e) {
         alert("Network error.");
     } finally {
         addAdminBtn.textContent = "Invite";
@@ -324,7 +340,7 @@ addAdminBtn?.addEventListener("click", async () => {
     }
 });
 
-window.deleteEvent = async function(eventId) {
+window.deleteEvent = async function (eventId) {
     if (!confirm(`Are you sure you want to permanently delete "${eventId}"? This cannot be undone.`)) return;
     try {
         const res = await fetch(`${API_BASE}/admin/events/${eventId}`, {
@@ -337,7 +353,7 @@ window.deleteEvent = async function(eventId) {
         } else {
             alert(data.detail);
         }
-    } catch(e) {
+    } catch (e) {
         alert("Network error.");
     }
 };
@@ -369,7 +385,7 @@ document.getElementById("load-more-btn")?.addEventListener("click", () => {
 
 function renderPastEventsDOM() {
     const container = document.getElementById("past-events-list");
-    
+
     if (allLoadedEvents.length === 0) {
         container.innerHTML = "<p style='color: #aaa; font-size: 0.9rem;'>No matching events found.</p>";
         return;
@@ -386,7 +402,7 @@ function renderPastEventsDOM() {
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Dates:</strong> ${e.start_date} to ${e.end_date}</p>
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Courses:</strong> ${(e.courses || []).join(", ")}</p>
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Location:</strong> ${e.language}-${e.country}</p>
-            <p style="margin: 0; font-size: 0.85rem; color: #e6edf3;"><strong>URL:</strong> <a href="https://vta-${e.id}.gca-americas.dev" target="_blank" style="color: #58a6ff;">https://vta-${e.id}.gca-americas.dev</a></p>
+            <p style="margin: 0; font-size: 0.85rem; color: #e6edf3;"><strong>URL:</strong> <a href="https://vta-${e.id}.gca-americas.com" target="_blank" style="color: #58a6ff;">https://vta-${e.id}.gca-americas.com</a></p>
         </div>
     `).join('') + ((!isSuperAdmin && !hasMoreEvents && allLoadedEvents.length <= 5) ? '' : `<p style="text-align: center; color: #aaa; font-size: 0.8rem; margin-top: 10px; grid-column: 1 / -1;">Loaded ${allLoadedEvents.length} events physically</p>`);
 }
@@ -427,11 +443,11 @@ async function loadPastEvents(append = false) {
         if (!append) allLoadedEvents = [];
         allLoadedEvents = allLoadedEvents.concat(data);
         hasMoreEvents = data.length === EVENTS_LIMIT;
-        
+
         const loadMoreBtn = document.getElementById("load-more-btn");
         const loadMoreContainer = document.getElementById("load-more-container");
         if (loadMoreBtn) loadMoreBtn.textContent = "Load More";
-        
+
         if (hasMoreEvents) {
             if (loadMoreContainer) loadMoreContainer.classList.remove("hidden");
         } else {
@@ -439,7 +455,7 @@ async function loadPastEvents(append = false) {
         }
 
         renderPastEventsDOM();
-        
+
     } catch (e) {
         console.error(e);
         document.getElementById("past-events-list").innerHTML = "<p style='color: #ff4a4a; font-size: 0.9rem;'>Connection Timeout. Are you sure you whitelisted your Wi-Fi IP in Google Cloud SQL?</p>";
@@ -470,62 +486,63 @@ downloadEventsBtn?.addEventListener("click", () => {
         headers: { "Authorization": `Bearer ${adminIdToken}` },
         cache: "no-store"
     })
-    .then(r => {
-        if (!r.ok) throw new Error("Download API Rejected");
-        return r.json();
-    })
-    .then(targetEvents => {
-        if (targetEvents.length === 0) return alert("No events found to export!");
+        .then(r => {
+            if (!r.ok) throw new Error("Download API Rejected");
+            return r.json();
+        })
+        .then(targetEvents => {
+            if (targetEvents.length === 0) return alert("No events found to export!");
 
-        const headers = ["Event ID", "Event Name", "Start Date", "End Date", "Language", "Country", "Created By", "Courses", "Status"];
-        const csvRows = [headers.join(",")];
-        
-        for (const e of targetEvents) {
-            const row = [
-                `"${e.id}"`,
-                `"${e.event_name}"`,
-                `"${e.start_date}"`,
-                `"${e.end_date}"`,
-                `"${e.language}"`,
-                `"${e.country}"`,
-                `"${e.createdBy}"`,
-                `"${(e.courses || []).join("; ")}"`,
-                `"${e.status || 'SCHEDULED'}"`
-            ];
-            csvRows.push(row.join(","));
-        }
+            const headers = ["Event ID", "Event Name", "Start Date", "End Date", "Language", "Country", "Created By", "Courses", "Status"];
+            const csvRows = [headers.join(",")];
 
-        const csvString = csvRows.join("\\n");
-        const blob = new Blob([csvString], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.setAttribute('hidden', '');
-        a.setAttribute('href', url);
-        a.setAttribute('download', isSuperAdmin ? 'all_events_export.csv' : 'events_last_6_months.csv');
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    })
-    .catch(e => {
-        console.error(e);
-        alert("Failed to export database log streams.");
-    })
-    .finally(() => {
-        downloadEventsBtn.textContent = "Download CSV (Full Export)";
-        downloadEventsBtn.disabled = false;
-    });
+            for (const e of targetEvents) {
+                const row = [
+                    `"${e.id}"`,
+                    `"${e.event_name}"`,
+                    `"${e.start_date}"`,
+                    `"${e.end_date}"`,
+                    `"${e.language}"`,
+                    `"${e.country}"`,
+                    `"${e.createdBy}"`,
+                    `"${(e.courses || []).join("; ")}"`,
+                    `"${e.status || 'SCHEDULED'}"`
+                ];
+                csvRows.push(row.join(","));
+            }
+
+            const csvString = csvRows.join("\\n");
+            const blob = new Blob([csvString], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', isSuperAdmin ? 'all_events_export.csv' : 'events_last_6_months.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        })
+        .catch(e => {
+            console.error(e);
+            alert("Failed to export database log streams.");
+        })
+        .finally(() => {
+            downloadEventsBtn.textContent = "Download CSV (Full Export)";
+            downloadEventsBtn.disabled = false;
+        });
 });
 
 createEventBtn.addEventListener("click", async () => {
     const eventName = setupEventName.value.trim();
     const startDate = setupStartDate.value;
     const endDate = setupEndDate.value;
-    const language = setupLanguage.value.trim() || "en";
-    const country = setupCountry.value.trim() || "US";
+    const language = setupLanguage.value.trim();
+    const country = setupCountry.value.trim();
 
     const courses = Array.from(selectedEventCourses);
 
     if (!eventName || !startDate || !endDate) return alert("Please fill in the Event Name and Dates.");
+    if (!language || !country) return alert("Please explicitly specify both the Language and Country strictly.");
     if (courses.length === 0) return alert("Please select at least 1 course.");
     if (courses.length > 5) return alert("Please select a maximum of 5 courses.");
 
@@ -560,13 +577,13 @@ createEventBtn.addEventListener("click", async () => {
             setupCountry.value = "";
             selectedEventCourses.clear();
             setupCoursesList.innerHTML = "<p style='color: #aaa; font-size: 0.9rem; margin: 0;'>Perform a search to load available courses.</p>";
-            
-            const targetUrl = `https://vta-${data.event_id}.gca-americas.dev`;
-            alert(`✅ Event Created Successfully!\n\nThe automated Cloud Build pipeline is now provisioning your ephemeral architecture.\n\nYour service will become available at:\n${targetUrl}`);
-            
+
+            const targetUrl = `https://vta-${data.event_id}.gca-americas.com`;
+            alert(`✅ Event Created Successfully!\n\nYour service will become available at:\n${targetUrl}`);
+
             adminConfigContainer.classList.add("hidden");
             showCreateFormBtn.classList.remove("hidden");
-            
+
             loadPastEvents();
         } else {
             alert(`Error: ${data.detail || 'Internal Server Error'}`);
