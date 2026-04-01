@@ -23,6 +23,8 @@
         .status-DEPLOYING { background: rgba(137, 87, 229, 0.2); color: #8957e5; }
         .status-RUNNING { background: rgba(46, 160, 67, 0.2); color: #3fb950; }
         .status-DEMOLISHING { background: rgba(248, 81, 73, 0.2); color: #ff7b72; }
+        .status-EVALUATING { background: rgba(210, 153, 34, 0.2); color: #d29922; }
+        .status-EVALUATED { background: rgba(137, 87, 229, 0.2); color: #8957e5; }
         .status-DEMOLISHED { background: rgba(139, 148, 158, 0.2); color: #8b949e; }
     </style>
 </head>
@@ -74,6 +76,8 @@
                                 <option value="PENDING">Pending</option>
                                 <option value="DEPLOYING">Deploying</option>
                                 <option value="RUNNING">Running</option>
+                                <option value="EVALUATING">Evaluating</option>
+                                <option value="EVALUATED">Evaluated</option>
                                 <option value="DEMOLISHING">Demolishing</option>
                                 <option value="DEMOLISHED">Demolished</option>
                             </select>
@@ -114,6 +118,13 @@
                     <div id="logs-list" style="display: flex; flex-direction: column; gap: 15px;">
                         <!-- JS renders logs here -->
                     </div>
+
+                    <div id="load-more-container" class="hidden" style="text-align: center; margin-top: 25px;">
+                        <button id="load-more-btn" class="glow-btn" style="background: #21262d; border: 1px solid rgba(255,255,255,0.1); width: auto; padding: 8px 24px;">Load More</button>
+                    </div>
+
+                    <button id="download-logs-btn" class="glow-btn"
+                        style="margin-top: 20px; padding: 12px; font-size: 0.95rem; background: #238636; box-shadow: 0 4px 14px rgba(35, 134, 54, 0.4); width: auto;">Download CSV (Full Export)</button>
                 </div>
 
             </div>

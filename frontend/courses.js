@@ -24,6 +24,39 @@ courseSearchInput?.addEventListener("keypress", (e) => {
     if (e.key === "Enter") courseSearchBtn.click();
 });
 
+const downloadCoursesBtn = document.getElementById("download-courses-btn");
+downloadCoursesBtn?.addEventListener("click", () => {
+    if (allCourses.length === 0) return alert("No courses found. Try searching first.");
+
+    const headers = ["Course ID", "Name", "Repository URL", "Directory Root", "Published", "Eval Score", "Last Eval Date", "Last Update Date"];
+    const csvRows = [headers.join(",")];
+    
+    for (const c of allCourses) {
+        const row = [
+            `"${c.id}"`,
+            `"${c.name}"`,
+            `"${c.repo_url}"`,
+            `"${c.directory_root}"`,
+            `"${c.is_published ? 'Yes' : 'No'}"`,
+            `"${c.eval_score || '0%'}"`,
+            `"${c.last_eval_date || 'N/A'}"`,
+            `"${c.last_update_date || 'Unknown'}"`
+        ];
+        csvRows.push(row.join(","));
+    }
+
+    const csvString = csvRows.join("\\n");
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', 'courses_export.csv');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+});
+
 // Inputs
 const inputMode = document.getElementById("course-mode");
 const inputId = document.getElementById("course-id");
@@ -135,15 +168,16 @@ function renderCourses() {
             </div>
             <p style="margin: 0 0 5px 0; font-size: 0.85rem; color: #8b949e; word-break: break-all;"><strong>Repo:</strong> <a href="${c.repo_url}" target="_blank" style="color: #58a6ff;">${c.repo_url}</a></p>
             <p style="margin: 0 0 5px 0; font-size: 0.85rem; color: #8b949e;"><strong>Path:</strong> <code>${c.directory_root}</code></p>
-            <div style="display: flex; gap: 15px; margin: 0 0 10px 0; font-size: 0.8rem; color: #8b949e; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
-                <div><strong>Eval Score:</strong> <span style="color: ${c.eval_score === '100%' || c.eval_score === '100' ? '#3fb950' : (c.eval_score === '0%' ? '#aaa' : '#d29922')};">${c.eval_score || '0%'}</span></div>
-                <div><strong>Last Eval:</strong> <span>${c.last_eval_date || 'N/A'}</span></div>
+            <div style="display: flex; gap: 15px; margin: 0 0 10px 0; align-items: center; font-size: 0.8rem; color: #8b949e; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="font-size: 1.1rem; color: #c9d1d9;"><strong>Eval Score:</strong> <span style="font-size: 1.6rem; font-weight: bold; margin-left: 5px; display: inline-block; vertical-align: middle; color: ${c.eval_score === '100%' || c.eval_score === '100' ? '#3fb950' : (c.eval_score === '0%' || c.eval_score === null || c.eval_score === undefined ? '#aaa' : '#d29922')};">${c.eval_score || '0%'}</span></div>
+                <div style="margin-left: auto;"><strong>Last Eval:</strong> <span>${c.last_eval_date || 'N/A'}</span></div>
             </div>
             <p style="margin: 0 0 15px 0; font-size: 0.75rem; color: #6e7681; font-style: italic;">Last Updated: ${c.last_update_date || 'Just now'}</p>
             
             <div style="display: flex; gap: 8px;">
                 <button onclick="editCourse('${c.id}')" class="glow-btn" style="padding: 4px 10px; font-size: 0.8rem; width: auto; min-height: 0;">Edit</button>
                 <button onclick="deleteCourse('${c.id}')" class="glow-btn" style="padding: 4px 10px; font-size: 0.8rem; width: auto; min-height: 0; background: #21262d; border: 1px solid rgba(255,255,255,0.1); color: #ff4a4a; box-shadow: none;">Delete</button>
+                <button onclick="window.location.href='eval_suggestions.html?course_id=${c.id}'" class="glow-btn" style="padding: 4px 10px; font-size: 0.8rem; width: auto; min-height: 0; background: #8957e5; box-shadow: 0 4px 14px rgba(137, 87, 229, 0.4);">View Evals</button>
             </div>
         </div>
     `).join('');

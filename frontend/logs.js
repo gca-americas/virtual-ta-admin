@@ -2,6 +2,9 @@ const API_BASE = "/api";
 
 let adminIdToken = null;
 let allLogs = [];
+let currentOffset = 0;
+const EVENTS_LIMIT = 50;
+let hasMoreEvents = false;
 
 const authContainer = document.getElementById("admin-auth-container");
 const actionBar = document.getElementById("admin-action-bar");
@@ -16,8 +19,21 @@ const dateTypeSelect = document.getElementById("log-date-type");
 const dateMinInput = document.getElementById("log-date-min");
 const dateMaxInput = document.getElementById("log-date-max");
 const executeSearchBtn = document.getElementById("execute-search-btn");
+const loadMoreBtn = document.getElementById("load-more-btn");
+const downloadLogsBtn = document.getElementById("download-logs-btn");
 
-executeSearchBtn?.addEventListener("click", loadLogs);
+executeSearchBtn?.addEventListener("click", () => {
+    currentOffset = 0;
+    allLogs = [];
+    document.getElementById("logs-list").innerHTML = "<p style='color: #aaa; font-size: 0.9rem;'>Searching logs...</p>";
+    loadLogs();
+});
+
+loadMoreBtn?.addEventListener("click", () => {
+    currentOffset += EVENTS_LIMIT;
+    if(loadMoreBtn) loadMoreBtn.textContent = "Loading...";
+    loadLogs(true);
+});
 
 async function initAdminAuth() {
     try {
@@ -90,11 +106,14 @@ async function processAdminIdToken(token) {
     }
 }
 
-async function loadLogs() {
+async function loadLogs(append = false) {
     if (!adminIdToken) return;
     
     try {
         const urlParams = new URLSearchParams();
+        urlParams.append("limit", EVENTS_LIMIT);
+        urlParams.append("offset", currentOffset);
+
         if (searchEventId.value.trim()) urlParams.append("event_id", searchEventId.value.trim());
         if (searchEventName.value.trim()) urlParams.append("event_name", searchEventName.value.trim());
         
@@ -114,7 +133,21 @@ async function loadLogs() {
         
         if (!res.ok) throw new Error("Fetch failed");
         
-        allLogs = await res.json();
+        const data = await res.json();
+        
+        if (!append) allLogs = [];
+        allLogs = allLogs.concat(data);
+        hasMoreEvents = data.length === EVENTS_LIMIT;
+
+        const loadMoreContainer = document.getElementById("load-more-container");
+        if (loadMoreBtn) loadMoreBtn.textContent = "Load More";
+        
+        if (hasMoreEvents) {
+            if (loadMoreContainer) loadMoreContainer.classList.remove("hidden");
+        } else {
+            if (loadMoreContainer) loadMoreContainer.classList.add("hidden");
+        }
+
         renderLogs();
     } catch(e) {
         document.getElementById("logs-list").innerHTML = "<p style='color: #ff4a4a;'>Failed to load running logs natively.</p>";
@@ -150,5 +183,76 @@ function renderLogs() {
             </div>
         </div>
         `;
-    }).join('');
+    }).join('') + (!hasMoreEvents && allLogs.length > 0 ? `<p style="text-align: center; color: #aaa; font-size: 0.8rem; margin-top: 10px;">Loaded ${allLogs.length} running logs physically</p>` : '');
 }
+
+downloadLogsBtn?.addEventListener("click", () => {
+    let qsParams = new URLSearchParams();
+    
+    if (searchEventId.value.trim()) qsParams.append("event_id", searchEventId.value.trim());
+    if (searchEventName.value.trim()) qsParams.append("event_name", searchEventName.value.trim());
+    
+    if (statusSelect.value) qsParams.append("status", statusSelect.value);
+    if (sortSelect.value) qsParams.append("sort_by", sortSelect.value);
+    
+    if (dateTypeSelect.value) qsParams.append("date_filter_type", dateTypeSelect.value);
+    if (dateMinInput.value && dateMaxInput.value) {
+        qsParams.append("date_min", dateMinInput.value);
+        qsParams.append("date_max", dateMaxInput.value);
+    }
+    
+    let qs = qsParams.toString();
+    if (qs.length > 0 && !qs.startsWith("&")) qs = "?" + qs;
+
+    downloadLogsBtn.textContent = "Compiling CSV Database Dump...";
+    downloadLogsBtn.disabled = true;
+
+    fetch(`${API_BASE}/admin/logs/export${qs}`, {
+        headers: { "Authorization": `Bearer ${adminIdToken}` },
+        cache: "no-store"
+    })
+    .then(r => {
+        if (!r.ok) throw new Error("Download API Rejected");
+        return r.json();
+    })
+    .then(targetLogs => {
+        if (targetLogs.length === 0) return alert("No logs found to export!");
+
+        const headers = ["Event ID", "Event Name", "Cloud Run Service", "Cloud Run URL", "Scheduled Start", "Scheduled End", "Actual Start", "Actual End", "Status"];
+        const csvRows = [headers.join(",")];
+        
+        for (const log of targetLogs) {
+            const row = [
+                `"${log.event_id}"`,
+                `"${log.event_name}"`,
+                `"${log.cloud_run_service_name}"`,
+                `"${log.cloud_run_url}"`,
+                `"${log.scheduled_start_date}"`,
+                `"${log.scheduled_end_date}"`,
+                `"${log.actual_datetime_started}"`,
+                `"${log.actual_datetime_ended}"`,
+                `"${log.status}"`
+            ];
+            csvRows.push(row.join(","));
+        }
+
+        const csvString = csvRows.join("\\n");
+        const blob = new Blob([csvString], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', 'running_logs_export.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    })
+    .catch(e => {
+        console.error(e);
+        alert("Failed to export logging streams.");
+    })
+    .finally(() => {
+        downloadLogsBtn.textContent = "Download CSV (Full Export)";
+        downloadLogsBtn.disabled = false;
+    });
+});

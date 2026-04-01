@@ -25,6 +25,9 @@ let adminIdToken = null;
 let allLoadedEvents = [];
 let isSuperAdmin = false;
 let selectedEventCourses = new Set();
+let currentOffset = 0;
+const EVENTS_LIMIT = 50;
+let hasMoreEvents = false;
 
 // Toggles for SPA routing
 const countries = [
@@ -339,45 +342,40 @@ window.deleteEvent = async function(eventId) {
     }
 };
 
-document.getElementById("apply-filters-btn")?.addEventListener("click", () => renderPastEvents());
+document.getElementById("apply-filters-btn")?.addEventListener("click", () => {
+    currentOffset = 0;
+    allLoadedEvents = [];
+    document.getElementById("past-events-list").innerHTML = "<p style='color: #aaa; font-size: 0.9rem;'>Searching events...</p>";
+    loadPastEvents();
+});
 
 document.getElementById("clear-filters-btn")?.addEventListener("click", () => {
     document.getElementById("filter-start-date").value = "";
     document.getElementById("filter-end-date").value = "";
     document.getElementById("filter-creator").value = "";
-    renderPastEvents();
+    const statusEl = document.getElementById("filter-status");
+    if (statusEl) statusEl.value = "";
+    currentOffset = 0;
+    allLoadedEvents = [];
+    document.getElementById("past-events-list").innerHTML = "<p style='color: #aaa; font-size: 0.9rem;'>Loading events...</p>";
+    loadPastEvents();
 });
 
-function renderPastEvents() {
+document.getElementById("load-more-btn")?.addEventListener("click", () => {
+    currentOffset += EVENTS_LIMIT;
+    document.getElementById("load-more-btn").textContent = "Loading...";
+    loadPastEvents(true);
+});
+
+function renderPastEventsDOM() {
     const container = document.getElementById("past-events-list");
-    let filteredEvents = allLoadedEvents;
-
-    if (isSuperAdmin) {
-        const startDateStr = document.getElementById("filter-start-date").value;
-        const endDateStr = document.getElementById("filter-end-date").value;
-        const creatorEmail = document.getElementById("filter-creator").value.trim().toLowerCase();
-
-        if (startDateStr) {
-            const startD = new Date(startDateStr);
-            filteredEvents = filteredEvents.filter(e => new Date(e.start_date) >= startD);
-        }
-        if (endDateStr) {
-            const endD = new Date(endDateStr);
-            filteredEvents = filteredEvents.filter(e => new Date(e.end_date) <= endD);
-        }
-        if (creatorEmail) {
-            filteredEvents = filteredEvents.filter(e => e.createdBy && e.createdBy.toLowerCase().includes(creatorEmail));
-        }
-    } else {
-        filteredEvents = filteredEvents.slice(0, 5);
-    }
     
-    if (filteredEvents.length === 0) {
+    if (allLoadedEvents.length === 0) {
         container.innerHTML = "<p style='color: #aaa; font-size: 0.9rem;'>No matching events found.</p>";
         return;
     }
 
-    container.innerHTML = filteredEvents.map(e => `
+    container.innerHTML = allLoadedEvents.map(e => `
         <div style="background: rgba(13, 17, 23, 0.5); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); text-align: left; position: relative;">
             <button onclick="deleteEvent('${e.id}')" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #ff4a4a; cursor: pointer; font-size: 1.2rem;" title="Delete Event">🗑️</button>
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
@@ -386,18 +384,35 @@ function renderPastEvents() {
             </div>
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Created By:</strong> ${e.createdBy || 'Unknown'}</p>
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Dates:</strong> ${e.start_date} to ${e.end_date}</p>
-            <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Courses:</strong> ${e.courses.join(", ")}</p>
+            <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Courses:</strong> ${(e.courses || []).join(", ")}</p>
             <p style="margin: 0 0 2px 0; font-size: 0.85rem; color: #e6edf3;"><strong>Location:</strong> ${e.language}-${e.country}</p>
             <p style="margin: 0; font-size: 0.85rem; color: #e6edf3;"><strong>URL:</strong> <a href="https://vta-${e.id}.gca-americas.dev" target="_blank" style="color: #58a6ff;">https://vta-${e.id}.gca-americas.dev</a></p>
         </div>
-    `).join('') + ((!isSuperAdmin && allLoadedEvents.length > 5) ? `<p style="text-align: center; color: #aaa; font-size: 0.8rem; margin-top: 10px; grid-column: 1 / -1;">Showing 5 of ${allLoadedEvents.length} total events</p>` : '');
+    `).join('') + ((!isSuperAdmin && !hasMoreEvents && allLoadedEvents.length <= 5) ? '' : `<p style="text-align: center; color: #aaa; font-size: 0.8rem; margin-top: 10px; grid-column: 1 / -1;">Loaded ${allLoadedEvents.length} events physically</p>`);
 }
 
-async function loadPastEvents() {
+async function loadPastEvents(append = false) {
     if (!adminIdToken) return;
 
     try {
-        const response = await fetch(`${API_BASE}/admin/events`, {
+        let qs = `?limit=${EVENTS_LIMIT}&offset=${currentOffset}`;
+
+        if (isSuperAdmin) {
+            const startD = document.getElementById("filter-start-date")?.value;
+            const endD = document.getElementById("filter-end-date")?.value;
+            const creator = document.getElementById("filter-creator")?.value.trim();
+            const status = document.getElementById("filter-status")?.value;
+
+            if (startD) qs += `&start_date=${encodeURIComponent(startD)}`;
+            if (endD) qs += `&end_date=${encodeURIComponent(endD)}`;
+            if (creator) qs += `&creator_email=${encodeURIComponent(creator)}`;
+            if (status) qs += `&status=${encodeURIComponent(status)}`;
+            else if (!startD && !endD && !creator) qs += `&status=RUNNING,SCHEDULED`;
+        } else {
+            qs += `&status=RUNNING,SCHEDULED`;
+        }
+
+        const response = await fetch(`${API_BASE}/admin/events${qs}`, {
             headers: { "Authorization": `Bearer ${adminIdToken}` },
             cache: "no-store"
         });
@@ -409,8 +424,21 @@ async function loadPastEvents() {
             return;
         }
 
-        allLoadedEvents = data;
-        renderPastEvents();
+        if (!append) allLoadedEvents = [];
+        allLoadedEvents = allLoadedEvents.concat(data);
+        hasMoreEvents = data.length === EVENTS_LIMIT;
+        
+        const loadMoreBtn = document.getElementById("load-more-btn");
+        const loadMoreContainer = document.getElementById("load-more-container");
+        if (loadMoreBtn) loadMoreBtn.textContent = "Load More";
+        
+        if (hasMoreEvents) {
+            if (loadMoreContainer) loadMoreContainer.classList.remove("hidden");
+        } else {
+            if (loadMoreContainer) loadMoreContainer.classList.add("hidden");
+        }
+
+        renderPastEventsDOM();
         
     } catch (e) {
         console.error(e);
@@ -419,46 +447,73 @@ async function loadPastEvents() {
 }
 
 downloadEventsBtn?.addEventListener("click", () => {
-    let targetEvents = allLoadedEvents;
-    
-    if (!isSuperAdmin) {
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        targetEvents = allLoadedEvents.filter(e => {
-            const eventDate = new Date(e.start_date);
-            return eventDate >= sixMonthsAgo;
-        });
+    let qs = "";
+    if (isSuperAdmin) {
+        const startD = document.getElementById("filter-start-date")?.value;
+        const endD = document.getElementById("filter-end-date")?.value;
+        const creator = document.getElementById("filter-creator")?.value.trim();
+        const status = document.getElementById("filter-status")?.value;
+
+        if (startD) qs += `&start_date=${encodeURIComponent(startD)}`;
+        if (endD) qs += `&end_date=${encodeURIComponent(endD)}`;
+        if (creator) qs += `&creator_email=${encodeURIComponent(creator)}`;
+        if (status) qs += `&status=${encodeURIComponent(status)}`;
     }
 
-    if (targetEvents.length === 0) return alert("No events to download!");
+    if (qs.length > 0 && !qs.startsWith("&")) qs = "?" + qs;
+    else if (qs.startsWith("&")) qs = "?" + qs.substring(1);
 
-    const headers = ["Event ID", "Event Name", "Start Date", "End Date", "Language", "Country", "Created By", "Courses"];
-    const csvRows = [headers.join(",")];
-    
-    for (const e of targetEvents) {
-        const row = [
-            `"${e.id}"`,
-            `"${e.event_name}"`,
-            `"${e.start_date}"`,
-            `"${e.end_date}"`,
-            `"${e.language}"`,
-            `"${e.country}"`,
-            `"${e.createdBy}"`,
-            `"${e.courses.join("; ")}"`
-        ];
-        csvRows.push(row.join(","));
-    }
+    downloadEventsBtn.textContent = "Compiling CSV Database Dump...";
+    downloadEventsBtn.disabled = true;
 
-    const csvString = csvRows.join("\n");
-    const blob = new Blob([csvString], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', isSuperAdmin ? 'all_events_export.csv' : 'events_last_6_months.csv');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    fetch(`${API_BASE}/admin/events/export${qs}`, {
+        headers: { "Authorization": `Bearer ${adminIdToken}` },
+        cache: "no-store"
+    })
+    .then(r => {
+        if (!r.ok) throw new Error("Download API Rejected");
+        return r.json();
+    })
+    .then(targetEvents => {
+        if (targetEvents.length === 0) return alert("No events found to export!");
+
+        const headers = ["Event ID", "Event Name", "Start Date", "End Date", "Language", "Country", "Created By", "Courses", "Status"];
+        const csvRows = [headers.join(",")];
+        
+        for (const e of targetEvents) {
+            const row = [
+                `"${e.id}"`,
+                `"${e.event_name}"`,
+                `"${e.start_date}"`,
+                `"${e.end_date}"`,
+                `"${e.language}"`,
+                `"${e.country}"`,
+                `"${e.createdBy}"`,
+                `"${(e.courses || []).join("; ")}"`,
+                `"${e.status || 'SCHEDULED'}"`
+            ];
+            csvRows.push(row.join(","));
+        }
+
+        const csvString = csvRows.join("\\n");
+        const blob = new Blob([csvString], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', isSuperAdmin ? 'all_events_export.csv' : 'events_last_6_months.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    })
+    .catch(e => {
+        console.error(e);
+        alert("Failed to export database log streams.");
+    })
+    .finally(() => {
+        downloadEventsBtn.textContent = "Download CSV (Full Export)";
+        downloadEventsBtn.disabled = false;
+    });
 });
 
 createEventBtn.addEventListener("click", async () => {

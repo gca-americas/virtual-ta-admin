@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop TA Admin - Eval Analytics</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .eval-card {
+            background: rgba(13, 17, 23, 0.5); 
+            padding: 15px; 
+            border-radius: 8px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            text-align: left;
+            margin-bottom: 15px;
+        }
+        .markdown-body {
+            color: #c9d1d9;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.05);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .markdown-body pre { background: #161b22; padding: 10px; border-radius: 6px; overflow-x: auto;}
+        .markdown-body code { font-family: monospace; background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px; }
+        
+        /* Modal Base */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0; top: 0; width: 100%; height: 100%; 
+            background-color: rgba(0,0,0,0.8); 
+            backdrop-filter: blur(5px);
+            align-items: center; 
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #0d1117; 
+            margin: auto; 
+            padding: 25px; 
+            border: 1px solid #30363d; 
+            width: 80%; 
+            max-width: 1000px; 
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.8);
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal-content h2 { color: #f0f6fc; margin-top: 0; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
+        .close-modal { color: #8b949e; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-modal:hover { color: #ffffff; }
+    </style>
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob shape1"></div>
+        <div class="blob shape2"></div>
+        <div class="blob shape3"></div>
+    </div>
+
+    <div class="container" id="app">
+        <div class="form-container" style="max-width: 1000px;">
+            <div id="content">
+
+                <!-- Google Auth -->
+                <div id="admin-auth-container" style="text-align: center; margin-top: 40px;">
+                    <h2 style="color: white; margin-bottom: 5px;">SuperAdmin Required</h2>
+                    <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 25px;">Please authenticate to access Evaluation Analytics</p>
+                    <div id="google-btn" style="display: inline-block;"></div>
+                    <p id="admin-auth-msg" style="color: #aaa; font-size: 0.85rem; margin-top: 20px;"></p>
+                </div>
+
+                <!-- Action Bar -->
+                <div id="admin-action-bar" class="hidden" style="margin-bottom: 25px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px;">
+                        <div>
+                            <h2 style="color: white; margin: 0 0 5px 0; font-size: 1.4rem;">Evaluation Analytics</h2>
+                            <p id="course-title-display" style="color: #58a6ff; font-size: 1rem; margin: 0;">Loading Course...</p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="window.location.href='courses.html'" class="glow-btn" style="padding: 8px 16px; font-size: 0.9rem; width: auto; background: #21262d; border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Back to Courses</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Evals List -->
+                <div id="evals-view" class="hidden">
+                    <div id="evals-list">
+                        <!-- JS renders eval cards -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Suggestion Modal -->
+    <div id="suggestion-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="close-suggestion">&times;</span>
+            <h2>Evaluation Suggested Updates</h2>
+            <div id="suggestion-markdown-content" class="markdown-body"></div>
+        </div>
+    </div>
+
+    <!-- Questions Modal -->
+    <div id="questions-modal" class="modal">
+        <div class="modal-content" style="max-width: 1200px;">
+            <span class="close-modal" id="close-questions">&times;</span>
+            <h2>Evaluation Questions Mapping</h2>
+            <div id="questions-list-content"></div>
+        </div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="eval_suggestions.js"></script>
+    <script>
+        window.onload = initAdminAuth;
+    </script>
+</body>
+</html>

@@ -140,7 +140,15 @@ async def create_event(
 
 
 @app.get("/api/admin/events")
-async def list_events(admin_info: dict = Depends(verify_admin_token)):
+async def list_events(
+    limit: int = 50,
+    offset: int = 0,
+    status: str = None,
+    start_date: str = None,
+    end_date: str = None,
+    creator_email: str = None,
+    admin_info: dict = Depends(verify_admin_token)
+):
     user_email = admin_info.get("email", "unknown")
     is_root = admin_info.get("role") == "superadmin"
 
@@ -149,26 +157,57 @@ async def list_events(admin_info: dict = Depends(verify_admin_token)):
     try:
         cur = conn.cursor()
         try:
-            if is_root:
-                cur.execute(
-                    "SELECT e.id, e.event_name, e.start_date, e.end_date, e.language, e.country, e.created_by, COALESCE(rl.status, 'SCHEDULED') AS status FROM events e LEFT JOIN running_logs rl ON e.id = rl.event_id ORDER BY e.start_date DESC"
-                )
-            else:
-                cur.execute(
-                    "SELECT e.id, e.event_name, e.start_date, e.end_date, e.language, e.country, e.created_by, COALESCE(rl.status, 'SCHEDULED') AS status FROM events e LEFT JOIN running_logs rl ON e.id = rl.event_id WHERE e.created_by = %s ORDER BY e.start_date DESC",
-                    (user_email,),
-                )
+            query = """
+                SELECT e.id, e.event_name, e.start_date, e.end_date, e.language, e.country, e.created_by, 
+                       COALESCE(rl.status, 'SCHEDULED') AS status,
+                       STRING_AGG(ec.course_id, ',') AS courses
+                FROM events e 
+                LEFT JOIN running_logs rl ON e.id = rl.event_id 
+                LEFT JOIN event_courses ec ON e.id = ec.event_id
+            """
 
+            conditions = []
+            params = []
+
+            if not is_root:
+                conditions.append("e.created_by = %s")
+                params.append(user_email)
+            elif creator_email:
+                conditions.append("e.created_by ILIKE %s")
+                params.append(f"%{creator_email}%")
+
+            if start_date:
+                conditions.append("e.start_date >= %s")
+                params.append(start_date)
+
+            if end_date:
+                conditions.append("e.end_date <= %s")
+                params.append(end_date)
+
+            if status:
+                status_list = [s.strip() for s in status.split(',')]
+                status_conds = []
+                for s in status_list:
+                    if s == "SCHEDULED":
+                        status_conds.append("rl.status IS NULL")
+                    else:
+                        status_conds.append("rl.status = %s")
+                        params.append(s)
+                if status_conds:
+                    conditions.append(f"({' OR '.join(status_conds)})")
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " GROUP BY e.id, rl.status ORDER BY e.start_date DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+
+            cur.execute(query, params)
             columns = [desc[0] for desc in cur.description]
             db_events = [dict(zip(columns, row)) for row in cur.fetchall()]
 
             for row in db_events:
-                cur.execute(
-                    "SELECT course_id FROM event_courses WHERE event_id = %s",
-                    (row["id"],),
-                )
-                courses = [c[0] for c in cur.fetchall()]
-
+                courses_list = row["courses"].split(',') if row["courses"] else []
                 events.append(
                     {
                         "id": row["id"],
@@ -183,7 +222,100 @@ async def list_events(admin_info: dict = Depends(verify_admin_token)):
                         "country": row["country"],
                         "createdBy": row["created_by"],
                         "status": row["status"],
-                        "courses": courses,
+                        "courses": courses_list,
+                    }
+                )
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+    return events
+
+
+@app.get("/api/admin/events/export")
+async def export_events(
+    status: str = None,
+    start_date: str = None,
+    end_date: str = None,
+    creator_email: str = None,
+    admin_info: dict = Depends(verify_admin_token)
+):
+    user_email = admin_info.get("email", "unknown")
+    is_root = admin_info.get("role") == "superadmin"
+
+    conn = get_db_connection()
+    events = []
+    try:
+        cur = conn.cursor()
+        try:
+            query = """
+                SELECT e.id, e.event_name, e.start_date, e.end_date, e.language, e.country, e.created_by, 
+                       COALESCE(rl.status, 'SCHEDULED') AS status,
+                       STRING_AGG(ec.course_id, ',') AS courses
+                FROM events e 
+                LEFT JOIN running_logs rl ON e.id = rl.event_id 
+                LEFT JOIN event_courses ec ON e.id = ec.event_id
+            """
+
+            conditions = []
+            params = []
+
+            if not is_root:
+                conditions.append("e.created_by = %s")
+                params.append(user_email)
+                
+                # Natively restrict Non-SuperAdmins strictly to the last 6 months mathematically!
+                import datetime
+                six_months_ago = datetime.datetime.now() - datetime.timedelta(days=180)
+                conditions.append("e.start_date >= %s")
+                params.append(six_months_ago.strftime("%Y-%m-%d"))
+            elif creator_email:
+                conditions.append("e.created_by ILIKE %s")
+                params.append(f"%{creator_email}%")
+
+            if start_date:
+                conditions.append("e.start_date >= %s")
+                params.append(start_date)
+
+            if end_date:
+                conditions.append("e.end_date <= %s")
+                params.append(end_date)
+
+            if status:
+                status_list = [s.strip() for s in status.split(',')]
+                status_conds = []
+                for s in status_list:
+                    if s == "SCHEDULED":
+                        status_conds.append("rl.status IS NULL")
+                    else:
+                        status_conds.append("rl.status = %s")
+                        params.append(s)
+                if status_conds:
+                    conditions.append(f"({' OR '.join(status_conds)})")
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " GROUP BY e.id, rl.status ORDER BY e.start_date DESC"
+
+            cur.execute(query, params)
+            columns = [desc[0] for desc in cur.description]
+            db_events = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+            for row in db_events:
+                courses_list = row["courses"].split(',') if row["courses"] else []
+                events.append(
+                    {
+                        "id": row["id"],
+                        "event_name": row["event_name"],
+                        "start_date": row["start_date"].strftime("%Y-%m-%d") if getattr(row.get("start_date"), "strftime", None) else str(row.get("start_date", "")),
+                        "end_date": row["end_date"].strftime("%Y-%m-%d") if getattr(row.get("end_date"), "strftime", None) else str(row.get("end_date", "")),
+                        "language": row["language"],
+                        "country": row["country"],
+                        "createdBy": row["created_by"],
+                        "status": row["status"],
+                        "courses": courses_list,
                     }
                 )
         finally:
@@ -356,14 +488,26 @@ async def list_admin_courses(
     try:
         cur = conn.cursor()
         try:
+            sql_base = """
+                SELECT c.id, c.name, c.repo_url, c.directory_root, c.is_published, 
+                       es.eval_date_time as last_eval_date, es.score as eval_score, 
+                       c.last_update_date
+                FROM courses c
+                LEFT JOIN LATERAL (
+                    SELECT score, eval_date_time 
+                    FROM eval_suggestion 
+                    WHERE course_id = c.id 
+                    ORDER BY eval_date_time DESC 
+                    LIMIT 1
+                ) es ON true
+            """
+
             if not q or q == "*":
-                cur.execute(
-                    "SELECT id, name, repo_url, directory_root, is_published, last_eval_date, eval_score, last_update_date FROM courses ORDER BY name ASC"
-                )
+                cur.execute(f"{sql_base} ORDER BY c.name ASC")
             else:
                 wildcard_q = f"%%{q}%%"
                 cur.execute(
-                    "SELECT id, name, repo_url, directory_root, is_published, last_eval_date, eval_score, last_update_date FROM courses WHERE name ILIKE %s OR id ILIKE %s ORDER BY name ASC LIMIT 50",
+                    f"{sql_base} WHERE c.name ILIKE %s OR c.id ILIKE %s ORDER BY c.name ASC LIMIT 50",
                     (wildcard_q, wildcard_q),
                 )
 
@@ -562,6 +706,109 @@ async def admin_delete_course(
 
 @app.get("/api/admin/logs")
 async def admin_get_logs(
+    limit: int = 50,
+    offset: int = 0,
+    event_id: str = None,
+    event_name: str = None,
+    status: str = None,
+    sort_by: str = "scheduled_start_date",
+    date_filter_type: str = "scheduled_start",
+    date_min: str = None,
+    date_max: str = None,
+    admin_info: dict = Depends(verify_admin_token),
+):
+    if admin_info.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(
+            status_code=403, detail="Admin clearance strictly required."
+        )
+
+    conn = get_db_connection()
+    logs = []
+    try:
+        cur = conn.cursor()
+        try:
+            query_base = "SELECT event_id, event_name, cloud_run_service_name, cloud_run_url, scheduled_start_date, scheduled_end_date, actual_datetime_started, actual_datetime_ended, status FROM running_logs WHERE 1=1"
+            params = []
+
+            if event_id:
+                query_base += " AND event_id = %s"
+                params.append(event_id)
+
+            if event_name:
+                query_base += " AND event_name ILIKE %s"
+                params.append(f"%{event_name}%")
+
+            if status:
+                query_base += " AND status = %s"
+                params.append(status)
+
+            if date_min and date_max:
+                if date_filter_type == "scheduled_start":
+                    query_base += (
+                        " AND scheduled_start_date >= %s AND scheduled_start_date <= %s"
+                    )
+                    params.extend([date_min, date_max])
+                elif date_filter_type == "scheduled_end":
+                    query_base += (
+                        " AND scheduled_end_date >= %s AND scheduled_end_date <= %s"
+                    )
+                    params.extend([date_min, date_max])
+                elif date_filter_type == "actual_start":
+                    query_base += " AND DATE(actual_datetime_started) >= %s AND DATE(actual_datetime_started) <= %s"
+                    params.extend([date_min, date_max])
+                elif date_filter_type == "actual_end":
+                    query_base += " AND DATE(actual_datetime_ended) >= %s AND DATE(actual_datetime_ended) <= %s"
+                    params.extend([date_min, date_max])
+
+            allowed_sort = [
+                "event_id",
+                "event_name",
+                "scheduled_start_date",
+                "scheduled_end_date",
+                "actual_datetime_started",
+                "actual_datetime_ended",
+                "status",
+            ]
+            if sort_by not in allowed_sort:
+                sort_by = "scheduled_start_date"
+
+            query_base += f" ORDER BY {sort_by} DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+
+            cur.execute(query_base, tuple(params))
+            for row in cur.fetchall():
+                logs.append(
+                    {
+                        "event_id": row[0],
+                        "event_name": row[1],
+                        "cloud_run_service_name": row[2],
+                        "cloud_run_url": row[3],
+                        "scheduled_start_date": row[4].strftime("%Y-%m-%d")
+                        if row[4]
+                        else None,
+                        "scheduled_end_date": row[5].strftime("%Y-%m-%d")
+                        if row[5]
+                        else None,
+                        "actual_datetime_started": row[6].isoformat()
+                        if row[6]
+                        else None,
+                        "actual_datetime_ended": row[7].isoformat() if row[7] else None,
+                        "status": row[8],
+                    }
+                )
+        finally:
+            cur.close()
+    except Exception as e:
+        print(f"Error fetching logs natively: {e}")
+        raise HTTPException(status_code=500, detail="Database fetch execution aborted.")
+    finally:
+        conn.close()
+
+    return logs
+
+
+@app.get("/api/admin/logs/export")
+async def admin_export_logs(
     event_id: str = None,
     event_name: str = None,
     status: str = None,
@@ -654,6 +901,98 @@ async def admin_get_logs(
     except Exception as e:
         print(f"Error fetching logs natively: {e}")
         raise HTTPException(status_code=500, detail="Database fetch execution aborted.")
+    finally:
+        conn.close()
+
+    return logs
+
+
+@app.get("/api/admin/eval_suggestions")
+async def get_eval_suggestions(
+    course_id: str,
+    admin_info: dict = Depends(verify_admin_token)
+):
+    if admin_info.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(
+            status_code=403, detail="Admin clearance strictly required."
+        )
+
+    conn = get_db_connection()
+    suggestions = []
+    try:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT id, course_id, eval_date_time, score, suggest_update
+                FROM eval_suggestion
+                WHERE course_id = %s
+                ORDER BY eval_date_time DESC
+                LIMIT 20
+                """,
+                (course_id,)
+            )
+            for row in cur.fetchall():
+                suggestions.append({
+                    "id": row[0],
+                    "course_id": row[1],
+                    "eval_date_time": row[2].isoformat() if row[2] else None,
+                    "score": row[3],
+                    "suggest_update": row[4]
+                })
+        finally:
+            cur.close()
+    except Exception as e:
+        print(f"Failed to fetch eval suggestions: {e}")
+        raise HTTPException(status_code=500, detail="Database fetch failed.")
+    finally:
+        conn.close()
+        
+    return suggestions
+
+
+@app.get("/api/admin/eval_logs")
+async def get_eval_logs(
+    course_id: str,
+    eval_date_time: str,
+    admin_info: dict = Depends(verify_admin_token)
+):
+    if admin_info.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(
+            status_code=403, detail="Admin clearance strictly required."
+        )
+
+    conn = get_db_connection()
+    logs = []
+    try:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT id, event_id, course_id, eval_date_time, level, question_number, question, prefer_answer, ta_answer
+                FROM eval_log
+                WHERE course_id = %s AND eval_date_time = %s
+                ORDER BY question_number ASC
+                """,
+                (course_id, eval_date_time)
+            )
+            for row in cur.fetchall():
+                logs.append({
+                    "id": row[0],
+                    "event_id": row[1],
+                    "course_id": row[2],
+                    "eval_date_time": row[3].isoformat() if row[3] else None,
+                    "level": row[4],
+                    "question_number": row[5],
+                    "question": row[6],
+                    "prefer_answer": row[7],
+                    "ta_answer": row[8]
+                })
+        finally:
+            cur.close()
+    except Exception as e:
+        print(f"Failed to fetch eval logs: {e}")
+        raise HTTPException(status_code=500, detail="Database fetch failed.")
     finally:
         conn.close()
 
